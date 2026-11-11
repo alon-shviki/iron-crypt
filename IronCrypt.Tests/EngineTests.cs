@@ -602,6 +602,56 @@ public class EngineTests
         Assert.NotEqual(calmRow, shakenRow); // the wall's top edge moved
     }
 
+    // ── Phase 8: whole-level playthroughs ──
+
+    /// <summary>
+    /// A bot plays real generated levels start to finish: fetch the keys in order, walk to the exit, shoot whatever
+    /// is in the way. Proves the pieces work together — doors open, keys unlock, enemies cannot wall the player in.
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void Bot_CanFinishGeneratedLevels(int seed)
+    {
+        var e = new Engine();
+        e.NewGame(seed);
+        for (var depth = 1; depth <= 4; depth++)
+        {
+            var lvl = e.Level;
+            for (var i = 0; i < 60 * 240 && !e.LevelComplete; i++)
+            {
+                e.Health = Engine.MaxHealth; // the bot is testing the level, not its own aim
+
+                int Find(PickupKind kind) => e.Pickups.Where(p => p.Kind == kind).Select(p => (int)p.Y * lvl.W + (int)p.X).DefaultIfEmpty(-1).First();
+                var blue = Find(PickupKind.KeyBlue);
+                var red = Find(PickupKind.KeyRed);
+                var reach = LevelGenerator.Flood(lvl, (int)e.Px, (int)e.Py, e.HasRedKey, e.HasBlueKey);
+                var exit = lvl.ExitY * lvl.W + lvl.ExitX;
+                var goal = reach[exit] >= 0 ? exit : red >= 0 && reach[red] >= 0 ? red : blue;
+                Assert.True(goal >= 0 && reach[goal] >= 0, $"bot has nowhere to go, seed {seed} depth {depth}");
+
+                // step downhill on the distance field measured from the goal
+                var toGoal = LevelGenerator.Flood(lvl, goal % lvl.W, goal / lvl.W, e.HasRedKey, e.HasBlueKey);
+                var here = (int)e.Py * lvl.W + (int)e.Px;
+                var next = new[] { here + 1, here - 1, here + lvl.W, here - lvl.W }
+                    .Where(n => toGoal[n] >= 0).OrderBy(n => toGoal[n]).First();
+                if (toGoal[here] == 0) next = here;
+                e.Angle = Math.Atan2(next / lvl.W + 0.5 - e.Py, next % lvl.W + 0.5 - e.Px);
+                e.Tick(1 / 60.0, new PlayerInput { Forward = 1, Fire = true });
+                e.Sounds.Clear();
+                Assert.True(e.IsFree(e.Px, e.Py), $"player in wall, seed {seed} depth {depth}");
+            }
+            Assert.True(e.LevelComplete, $"bot did not finish seed {seed} depth {depth} (stuck at {e.Px:0.0},{e.Py:0.0})");
+            e.NextLevel();
+        }
+        Assert.Equal(5, e.Depth);
+        Assert.True(e.Score >= Engine.LevelBonus * 10);
+    }
+
     // ── Renderer ──
 
     [Fact]
