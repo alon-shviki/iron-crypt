@@ -1,0 +1,23 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #07060a;
+    color: #e2e8f0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.game-container { position: relative; width: 100vw; height: 100vh; }
+
+.loading-progress-text {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #ef4444; font-family: monospace; letter-spacing: 0.2em;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: #7f1d1d; color: #fff; padding: 10px 16px;
+}

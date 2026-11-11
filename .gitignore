@@ -1,0 +1,8 @@
+.obsidian/
+.worktrees/
+.env
+.env.*
+.claude/settings.local.json
+bin/
+obj/
+node_modules/

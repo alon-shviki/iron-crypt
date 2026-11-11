@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ci:
+    uses: alon-shviki/game-portal/.github/workflows/dotnet-ci.yml@main
+    with:
+      project: IronCrypt.Client/IronCrypt.Client.csproj
+      tests: IronCrypt.Tests/IronCrypt.Tests.csproj
+      image: iron-crypt-client
+      context: .
+      dockerfile: IronCrypt.Client/Dockerfile

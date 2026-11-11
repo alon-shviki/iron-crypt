@@ -1,0 +1,47 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.microsoft/usersecrets/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; case \"$f\" in */bin/*|*/obj/*) echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Generated file — bin/obj are build artifacts, never hand-edit.\"}}' ;; *) exit 0 ;; esac; }",
+            "statusMessage": "Checking generated-file guard..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; case \"$f\" in *.cs|*.razor) dirname \"$f\" > /tmp/iron-crypt-build-pending ;; *) exit 0 ;; esac; }",
+            "statusMessage": "Flagging build gate..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); [ \"$(printf '%s' \"$input\" | jq -r '.stop_hook_active // false')\" = \"true\" ] && exit 0; [ -f /tmp/iron-crypt-build-pending ] || exit 0; dir=$(cat /tmp/iron-crypt-build-pending); rm -f /tmp/iron-crypt-build-pending; root=$(git -C \"$dir\" rev-parse --show-toplevel 2>/dev/null) || exit 0; out=$(dotnet build \"$root/IronCrypt.Tests/IronCrypt.Tests.csproj\" --nologo -v q 2>&1) || { printf 'BUILD GATE FAILED — the solution does not compile. Fix before finishing:\\n%s\\n' \"$out\" >&2; exit 2; }",
+            "timeout": 180,
+            "statusMessage": "Build gate: compiling client + tests..."
+          }
+        ]
+      }
+    ]
+  }
+}

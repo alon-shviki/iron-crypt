@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iron Crypt</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="loading-progress-text">Loading Iron Crypt…</div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script>
+      // Pick up portal JWT passed via URL hash (#portal_token=...) when opening from portal
+      (function () {
+        var m = location.hash.slice(1).match(/(?:^|&)portal_token=([^&]*)/);
+        if (m) {
+          try { localStorage.setItem('jwt', decodeURIComponent(m[1])); } catch (e) {}
+          history.replaceState(null, '', location.pathname + location.search);
+        }
+      })();
+    </script>
+    <script src="js/gameInterop.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>
