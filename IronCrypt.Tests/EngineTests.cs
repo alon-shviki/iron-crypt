@@ -375,6 +375,165 @@ public class EngineTests
         Assert.Equal(0.5, e.RayToWall(Math.PI), 3);  // wall right behind
     }
 
+    // ── Phase 4: enemies ──
+
+    private static readonly string[] Hall =
+    {
+        "############",
+        "#S.........#",
+        "############",
+    };
+
+    [Fact]
+    public void Shooting_KillsTheNearestEnemyInTheLineOfFire_AndScores()
+    {
+        var e = NewEngine(Hall);
+        var near = e.SpawnEnemy(EnemyKind.Grunt, 5.5, 1.5)!;
+        var far = e.SpawnEnemy(EnemyKind.Grunt, 9.5, 1.5)!;
+        near.State = far.State = EnemyState.Pain; // hold them still for the test
+        near.Timer = far.Timer = 100;
+
+        for (var i = 0; i < 400 && near.Alive; i++) e.Tick(0.016, Fire);
+
+        Assert.False(near.Alive);
+        Assert.True(far.Alive, "the bullet stops in the first body");
+        Assert.Equal(1, e.Kills);
+        Assert.Equal(Engine.EnemyDefs[0].Score, e.Score);
+        Assert.Contains(Sfx.EnemyDie, e.Sounds);
+    }
+
+    [Fact]
+    public void Shooting_DoesNotHitThroughWalls_OrBehindThePlayer()
+    {
+        var e = NewEngine("#########", "#.S.#...#", "#########");
+        var hidden = e.SpawnEnemy(EnemyKind.Grunt, 6.5, 1.5)!;
+        var behind = e.SpawnEnemy(EnemyKind.Grunt, 1.5, 1.5)!;
+        hidden.State = behind.State = EnemyState.Pain;
+        hidden.Timer = behind.Timer = 100;
+        var hp = (hidden.Hp, behind.Hp);
+
+        Run(e, 2, Fire);
+        Assert.Equal(hp, (hidden.Hp, behind.Hp));
+    }
+
+    [Fact]
+    public void IdleEnemy_WakesOnSight_ButNotThroughAWall()
+    {
+        var e = NewEngine("#########", "#S..#...#", "#.......#", "#########");
+        var hidden = e.SpawnEnemy(EnemyKind.Shooter, 6.5, 1.5)!; // wall between
+        e.Tick(0.016, default);
+        Assert.Equal(EnemyState.Idle, hidden.State);
+
+        var seen = e.SpawnEnemy(EnemyKind.Shooter, 6.5, 2.5)!;
+        e.Py = 2.5;
+        e.Tick(0.016, default);
+        Assert.NotEqual(EnemyState.Idle, seen.State);
+        Assert.Contains(Sfx.EnemyAlert, e.Sounds);
+    }
+
+    [Fact]
+    public void Gunshot_WakesEnemiesWithinEarshot()
+    {
+        var e = NewEngine("#########", "#S..#...#", "#.......#", "#########");
+        var hidden = e.SpawnEnemy(EnemyKind.Grunt, 6.5, 1.5)!;
+        e.Angle = Math.PI; // fire at the wall behind
+        e.Tick(0.016, Fire);
+        Assert.Equal(EnemyState.Chase, hidden.State);
+    }
+
+    [Fact]
+    public void Grunt_PathfindsAroundWalls_AndMauls()
+    {
+        // the grunt starts with no line of sight and must route through the gap at the far end
+        var e = NewEngine(
+            "###########",
+            "#S........#",
+            "#########.#",
+            "#.........#",
+            "###########");
+        var grunt = e.SpawnEnemy(EnemyKind.Grunt, 1.5, 3.5)!;
+        grunt.State = EnemyState.Chase;
+
+        Run(e, 12, default);
+        Assert.True(e.Health < Engine.MaxHealth, $"grunt never reached the player (at {grunt.X:0.0},{grunt.Y:0.0})");
+        Assert.Contains(Sfx.PlayerHurt, e.Sounds);
+        Assert.True(e.IsFree(grunt.X, grunt.Y, Engine.EnemyDefs[0].Radius));
+    }
+
+    [Fact]
+    public void Shooter_HitsFromRange_OnlyWithLineOfSight()
+    {
+        var e = NewEngine(Hall);
+        var shooter = e.SpawnEnemy(EnemyKind.Shooter, 6.5, 1.5)!;
+        Run(e, 15, default);
+        Assert.True(e.Health < Engine.MaxHealth);
+        Assert.Contains(Sfx.EnemyShot, e.Sounds);
+        Assert.True(shooter.X > 4, "shooters keep their distance instead of charging");
+
+        var walled = NewEngine("#########", "#S..#...#", "#########");
+        walled.SpawnEnemy(EnemyKind.Shooter, 6.5, 1.5)!.State = EnemyState.Chase;
+        Run(walled, 10, default);
+        Assert.Equal(Engine.MaxHealth, walled.Health);
+    }
+
+    [Fact]
+    public void Enemy_OpensPlainDoors_ButNotLockedOnes()
+    {
+        var e = NewEngine("##########", "#S...D...#", "##########");
+        var grunt = e.SpawnEnemy(EnemyKind.Grunt, 7.5, 1.5)!;
+        grunt.State = EnemyState.Chase;
+        e.Px = 1.5; // far enough that the player is not the one opening it
+        Run(e, 8, default);
+        Assert.True(grunt.X < 5, "came through the door");
+
+        var locked = NewEngine("##########", "#S...R...#", "##########");
+        var stuck = locked.SpawnEnemy(EnemyKind.Grunt, 7.5, 1.5)!;
+        stuck.State = EnemyState.Chase;
+        Run(locked, 8, default);
+        Assert.True(stuck.X > 6, "locked door holds it back");
+        Assert.Equal(Engine.MaxHealth, locked.Health);
+    }
+
+    [Fact]
+    public void Enemies_NeverSpawnOrEndUpInsideWalls()
+    {
+        var blocked = NewEngine();
+        Assert.Null(blocked.SpawnEnemy(EnemyKind.Tank, 0.5, 0.5)); // solid wall
+        Assert.Null(blocked.SpawnEnemy(EnemyKind.Tank, 1.1, 1.1)); // overlapping a wall corner
+
+        for (var seed = 1; seed <= 6; seed++)
+        {
+            var e = new Engine();
+            e.NewGame(seed);
+            e.NextLevel();
+            e.NextLevel(); // depth 3: all three enemy types
+            Assert.Equal(e.Level.Enemies.Count, e.Enemies.Count);
+            e.Health = 1_000_000; // survive the whole simulation
+            foreach (var en in e.Enemies) en.State = EnemyState.Chase;
+
+            for (var i = 0; i < 60 * 40; i++)
+            {
+                e.Tick(1 / 60.0, new PlayerInput { Forward = Math.Sin(i / 50.0), Turn = 0.02, Fire = i % 3 == 0 });
+                if (i % 30 != 0) continue;
+                foreach (var en in e.Enemies)
+                    Assert.True(e.IsFree(en.X, en.Y, Engine.EnemyDefs[(int)en.Kind].Radius), $"enemy in wall, seed {seed} t={i}");
+                Assert.True(e.IsFree(e.Px, e.Py), $"player in wall, seed {seed} t={i}");
+            }
+        }
+    }
+
+    [Fact]
+    public void Enemies_GetTougherWithDepth()
+    {
+        var e = NewEngine(Hall);
+        e.Depth = 1;
+        var shallow = e.SpawnEnemy(EnemyKind.Tank, 5.5, 1.5)!.Hp;
+        e.Depth = 6;
+        var deep = e.SpawnEnemy(EnemyKind.Tank, 8.5, 1.5)!.Hp;
+        Assert.True(deep > shallow);
+        Assert.True(LevelGenerator.Generate(5, 6).Enemies.Count > LevelGenerator.Generate(5, 1).Enemies.Count);
+    }
+
     // ── Renderer ──
 
     [Fact]
@@ -408,6 +567,8 @@ public class EngineTests
         var e = NewEngine();
         var r = new Renderer(w, h);
         e.Angle = 1.1;
+        e.SpawnEnemy(EnemyKind.Tank, e.Px + 0.4, e.Py + 0.6); // a sprite right in the camera's face, partly off-screen
+        e.Pickups.Add(new Pickup { Kind = PickupKind.KeyRed, X = e.Px + 1, Y = e.Py + 1 });
         r.Render(e); // must not throw at any size
     }
 }

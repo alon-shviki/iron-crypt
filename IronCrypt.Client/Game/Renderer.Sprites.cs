@@ -17,11 +17,14 @@ public partial class Renderer
     private readonly List<Billboard> _bills = new();
     private readonly uint[][][] _pickupTex = new uint[Enum.GetValues<PickupKind>().Length][][];
     private uint[][] _exitTex = Array.Empty<uint[]>();
+    private readonly uint[][][][] _enemyTex = new uint[Enum.GetValues<EnemyKind>().Length][][][]; // [kind][frame][shade][texel]
 
     private void InitSprites()
     {
         foreach (var kind in Enum.GetValues<PickupKind>()) _pickupTex[(int)kind] = Art.Shaded(Art.PickupSprite(kind));
         _exitTex = Art.Shaded(Art.ExitSprite());
+        foreach (var kind in Enum.GetValues<EnemyKind>())
+            _enemyTex[(int)kind] = Enum.GetValues<EnemyFrame>().Select(f => Art.Shaded(Art.EnemySprite(kind, f))).ToArray();
     }
 
     private void DrawSprites(Engine e, int horizon, double scale)
@@ -94,6 +97,24 @@ public partial class Renderer
         }
     }
 
-    // enemies and blood join the billboard list in the enemy phase
-    private void CollectActors(Engine e) { }
+    private void CollectActors(Engine e)
+    {
+        foreach (var en in e.Enemies)
+        {
+            var frame = en.State switch
+            {
+                EnemyState.Dead => EnemyFrame.Dead,
+                EnemyState.Pain => EnemyFrame.Pain,
+                EnemyState.Windup => EnemyFrame.Attack,
+                _ => ((int)en.Anim & 1) == 0 ? EnemyFrame.Walk0 : EnemyFrame.Walk1,
+            };
+            _bills.Add(new Billboard
+            {
+                X = en.X,
+                Y = en.Y,
+                Tex = _enemyTex[(int)en.Kind][(int)frame],
+                Size = Engine.EnemyDefs[(int)en.Kind].Size,
+            });
+        }
+    }
 }
