@@ -21,6 +21,18 @@ canvas#view {
     font: 11px monospace; color: #64748b; pointer-events: none;
 }
 
+.hud-top {
+    position: absolute; top: 22px; left: 8px; z-index: 5;
+    font: bold 12px monospace; color: #cbd5e1; pointer-events: none;
+    text-shadow: 0 1px 2px #000;
+}
+
+.hud-msg {
+    position: absolute; top: 22%; left: 0; right: 0; z-index: 5;
+    text-align: center; font: bold 18px monospace; color: #fde68a; pointer-events: none;
+    text-shadow: 0 2px 4px #000;
+}
+
 .loading-progress-text {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;

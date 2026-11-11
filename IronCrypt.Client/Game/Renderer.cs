@@ -29,6 +29,7 @@ public partial class Renderer
             _floor[l] = Art.Scale(Art.Rgb(74, 64, 56), Art.Brightness(l));
             _ceil[l] = Art.Scale(Art.Rgb(44, 42, 52), Art.Brightness(l));
         }
+        InitSprites();
         Resize(w, h);
     }
 
@@ -59,6 +60,7 @@ public partial class Renderer
 
         DrawFloorAndCeiling(horizon, scale);
         DrawWalls(e, horizon, scale);
+        DrawSprites(e, horizon, scale);
         DrawMinimap(e);
 
         Buffer.BlockCopy(Fb, 0, Pixels, 0, Pixels.Length);

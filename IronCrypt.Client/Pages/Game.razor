@@ -7,6 +7,11 @@
 <div class="game-container">
     <canvas id="view" data-lock></canvas>
     <div class="hud-fps">@_fpsText</div>
+    <div class="hud-top">@_hudText</div>
+    @if (_engine.MessageTime > 0)
+    {
+        <div class="hud-msg">@_engine.Message</div>
+    }
 </div>
 
 @code {
@@ -22,6 +27,8 @@
     private double _lastTimestamp;
     private bool _loopStarted;
 
+    private string _hudText = "";
+    private object? _hudKey;
     private string _fpsText = "";
     private int _frames;
     private double _fpsWindow;
@@ -31,17 +38,7 @@
         if (!firstRender) return;
         _js = (IJSInProcessRuntime)JS;
         _dotNetRef = DotNetObjectReference.Create(this);
-        _engine.LoadLevel(Level.FromRows(
-            "################",
-            "#S.....#.......#",
-            "#......#.......#",
-            "#......D.......#",
-            "#......#...##..#",
-            "#......#...##..#",
-            "####.###.......#",
-            "#..............#",
-            "#..##......X...#",
-            "################"));
+        _engine.NewGame(Random.Shared.Next(1, 1_000_000));
         await JS.InvokeVoidAsync("gameInterop.initInput");
         await JS.InvokeVoidAsync("gameInterop.startLoop", _dotNetRef);
     }
@@ -72,9 +69,22 @@
         };
         _engine.Tick(dt, input);
         _engine.Sounds.Clear();
+        if (_engine.LevelComplete) _engine.NextLevel();
 
         _js.InvokeVoid("gameInterop.present", _renderer.Render(_engine), _renderer.W, _renderer.H);
         CountFrame(dt);
+        RefreshHud();
+    }
+
+    // HUD lives in the DOM; re-render only when something it shows actually changed
+    private void RefreshHud()
+    {
+        var key = (_engine.Depth, _engine.HasRedKey, _engine.HasBlueKey, _engine.MessageTime > 0, _engine.Message);
+        if (key.Equals(_hudKey)) return;
+        _hudKey = key;
+        _hudText = $"Depth {_engine.Depth} · Seed {_engine.Seed}"
+            + (_engine.HasRedKey ? " · RED KEY" : "") + (_engine.HasBlueKey ? " · BLUE KEY" : "");
+        StateHasChanged();
     }
 
     // FPS counter: one DOM update per second, never per frame
