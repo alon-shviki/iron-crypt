@@ -534,6 +534,74 @@ public class EngineTests
         Assert.True(LevelGenerator.Generate(5, 6).Enemies.Count > LevelGenerator.Generate(5, 1).Enemies.Count);
     }
 
+    // ── Phase 6: flow + polish ──
+
+    [Fact]
+    public void ClearingALevel_PaysABonusThatGrowsWithDepth()
+    {
+        var e = new Engine();
+        e.NewGame(5);
+        e.Px = e.Level.ExitX + 0.5;
+        e.Py = e.Level.ExitY + 0.5;
+        e.Tick(0.016, default);
+        Assert.True(e.LevelComplete);
+        Assert.Equal(Engine.LevelBonus, e.Score);
+
+        e.NextLevel();
+        Assert.Equal((2, false, Engine.LevelBonus), (e.Depth, e.LevelComplete, e.Score)); // score carries over
+        e.Px = e.Level.ExitX + 0.5;
+        e.Py = e.Level.ExitY + 0.5;
+        e.Tick(0.016, default);
+        Assert.Equal(Engine.LevelBonus * 3, e.Score);
+    }
+
+    [Fact]
+    public void NewGame_ResetsTheRun()
+    {
+        var e = new Engine();
+        e.NewGame(5);
+        e.Hurt(60);
+        e.Owned[2] = true;
+        e.Score = 999;
+        e.NextLevel();
+        e.NewGame(5);
+        Assert.Equal((1, Engine.MaxHealth, 0, false), (e.Depth, e.Health, e.Score, e.Owned[2]));
+    }
+
+    [Fact]
+    public void Hits_ThrowBlood_ThatFallsAndDisappears()
+    {
+        var e = NewEngine(Hall);
+        var tank = e.SpawnEnemy(EnemyKind.Tank, 4.5, 1.5)!;
+        e.Damage(tank, 5);
+        Assert.NotEmpty(e.Blood);
+        Run(e, 3, default);
+        Assert.Empty(e.Blood);
+
+        for (var i = 0; i < 500; i++) e.Damage(tank, 0); // never grows without bound
+        Assert.True(e.Blood.Count <= Engine.MaxBlood);
+    }
+
+    [Fact]
+    public void Renderer_FlashesRedWhenHurt_AndShakes()
+    {
+        var e = NewEngine();
+        var r = new Renderer(320, 200);
+        r.Render(e);
+        var calm = r.Fb[10 * 320 + 10];
+        var calmRow = Enumerable.Range(0, 200).First(y => r.Fb[y * 320 + 5] != r.Fb[5]); // first row that is not ceiling
+
+        e.Hurt(10);
+        e.Time = 0.5; // any phase where the shake offset is non-zero
+        r.Render(e);
+        var hurt = r.Fb[10 * 320 + 10];
+        Assert.True((hurt & 0xFF) > (calm & 0xFF), "red channel rises");
+        Assert.True(((hurt >> 8) & 0xFF) <= ((calm >> 8) & 0xFF), "green does not");
+
+        var shakenRow = Enumerable.Range(0, 200).First(y => r.Fb[y * 320 + 5] != r.Fb[5]);
+        Assert.NotEqual(calmRow, shakenRow); // the wall's top edge moved
+    }
+
     // ── Renderer ──
 
     [Fact]

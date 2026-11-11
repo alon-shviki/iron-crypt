@@ -17,12 +17,14 @@ public partial class Renderer
     private readonly List<Billboard> _bills = new();
     private readonly uint[][][] _pickupTex = new uint[Enum.GetValues<PickupKind>().Length][][];
     private uint[][] _exitTex = Array.Empty<uint[]>();
+    private uint[][] _bloodTex = Array.Empty<uint[]>();
     private readonly uint[][][][] _enemyTex = new uint[Enum.GetValues<EnemyKind>().Length][][][]; // [kind][frame][shade][texel]
 
     private void InitSprites()
     {
         foreach (var kind in Enum.GetValues<PickupKind>()) _pickupTex[(int)kind] = Art.Shaded(Art.PickupSprite(kind));
         _exitTex = Art.Shaded(Art.ExitSprite());
+        _bloodTex = Art.Shaded(new Painter().Ellipse(32, 32, 30, 30, Art.Rgb(190, 20, 20)).Px);
         foreach (var kind in Enum.GetValues<EnemyKind>())
             _enemyTex[(int)kind] = Enum.GetValues<EnemyFrame>().Select(f => Art.Shaded(Art.EnemySprite(kind, f))).ToArray();
     }
@@ -99,6 +101,9 @@ public partial class Renderer
 
     private void CollectActors(Engine e)
     {
+        foreach (var b in e.Blood)
+            _bills.Add(new Billboard { X = b.X, Y = b.Y, Tex = _bloodTex, Size = 0.06, Lift = b.Z });
+
         foreach (var en in e.Enemies)
         {
             var frame = en.State switch

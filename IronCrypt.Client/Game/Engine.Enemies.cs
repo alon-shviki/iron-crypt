@@ -6,6 +6,11 @@ public enum EnemyState { Idle, Chase, Windup, Pain, Dead }
 public record EnemyDef(int Hp, double Speed, double Radius, int Damage, double Range, double Windup, double Rest,
     bool Ranged, double PainChance, int Score, double Size);
 
+public struct BloodDrop
+{
+    public double X, Y, Z, Vx, Vy, Vz;
+}
+
 public class Enemy
 {
     public EnemyKind Kind;
@@ -34,7 +39,12 @@ public partial class Engine
     public const double HpPerDepth = 0.08;   // +8% enemy health per level below the first
     public const double DamagePerDepth = 0.05;
 
+    public const int MaxBlood = 120;
+
     public readonly List<Enemy> Enemies = new();
+    public readonly List<BloodDrop> Blood = new();
+
+    private readonly Random _fx = new(7); // cosmetic randomness only — kept apart so effects never shift gameplay rolls
 
     private int[] _flow = Array.Empty<int>(); // walking distance to the player from every cell — the pathfinding field
     private int _flowCell = -1;
@@ -43,6 +53,7 @@ public partial class Engine
     private void OnLevelLoaded()
     {
         Enemies.Clear();
+        Blood.Clear();
         _flowCell = -1;
         foreach (var s in Level.Enemies) SpawnEnemy(s.Kind, s.X, s.Y);
     }
@@ -66,6 +77,7 @@ public partial class Engine
 
     private void TickEnemies(double dt)
     {
+        TickBlood(dt);
         if (Enemies.Count == 0) return;
         RefreshFlow(dt);
 
@@ -265,5 +277,37 @@ public partial class Engine
         }
     }
 
-    private void OnEnemyHit(Enemy en) { } // blood arrives with the polish phase
+    // ── blood: short-lived droplets thrown from every hit, purely cosmetic ──
+
+    private void OnEnemyHit(Enemy en)
+    {
+        for (var i = 0; i < 5 && Blood.Count < MaxBlood; i++)
+        {
+            var a = _fx.NextDouble() * Math.PI * 2;
+            var speed = 0.4 + _fx.NextDouble() * 1.2;
+            Blood.Add(new BloodDrop
+            {
+                X = en.X,
+                Y = en.Y,
+                Z = 0.3 + _fx.NextDouble() * 0.3,
+                Vx = Math.Cos(a) * speed,
+                Vy = Math.Sin(a) * speed,
+                Vz = 0.5 + _fx.NextDouble() * 1.5,
+            });
+        }
+    }
+
+    private void TickBlood(double dt)
+    {
+        for (var i = Blood.Count - 1; i >= 0; i--)
+        {
+            var b = Blood[i];
+            b.Vz -= 6 * dt; // gravity
+            b.X += b.Vx * dt;
+            b.Y += b.Vy * dt;
+            b.Z += b.Vz * dt;
+            if (b.Z <= 0 || Level.Blocks((int)b.X, (int)b.Y)) Blood.RemoveAt(i);
+            else Blood[i] = b;
+        }
+    }
 }

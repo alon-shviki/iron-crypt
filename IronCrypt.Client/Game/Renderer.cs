@@ -10,6 +10,9 @@ public partial class Renderer
     public const int MiniCells = 21;       // minimap shows this many cells across, centered on the player
     public const int MiniScale = 2;        // pixels per cell
 
+    /// <summary>False hides the weapon, crosshair and minimap — used for the title-screen backdrop.</summary>
+    public bool Overlay = true;
+
     public int W { get; private set; }
     public int H { get; private set; }
     public uint[] Fb = Array.Empty<uint>();
@@ -56,14 +59,21 @@ public partial class Renderer
 
     public byte[] Render(Engine e)
     {
-        var horizon = H / 2;
+        // screen shake: the whole horizon jitters for as long as the engine says (hits taken, shotgun blasts)
+        var shake = e.Shake > 0 ? (int)(Math.Sin(e.Time * 95) * Math.Min(6, e.Shake * 28)) : 0;
+        var horizon = H / 2 + shake;
         var scale = W / (2 * PlaneLen); // wall height in pixels at distance 1
 
         DrawFloorAndCeiling(horizon, scale);
         DrawWalls(e, horizon, scale);
         DrawSprites(e, horizon, scale);
-        DrawWeapon(e);
-        DrawMinimap(e);
+        if (Overlay)
+        {
+            DrawWeapon(e);
+            DrawMinimap(e);
+        }
+        if (e.Dead) Tint(0.5);
+        else if (e.HurtFlash > 0) Tint(Math.Min(0.45, e.HurtFlash * 1.3));
 
         Buffer.BlockCopy(Fb, 0, Pixels, 0, Pixels.Length);
         return Pixels;
@@ -203,6 +213,21 @@ public partial class Renderer
         FillRect(pxc, pyc, MiniScale, MiniScale, Art.Rgb(255, 255, 255));
         FillRect(pxc + (int)Math.Round(Math.Cos(e.Angle) * 3), pyc + (int)Math.Round(Math.Sin(e.Angle) * 3),
             MiniScale, MiniScale, Art.Rgb(250, 204, 21));
+    }
+
+    /// <summary>Damage flash: push every pixel toward red by k (0..1).</summary>
+    private void Tint(double k)
+    {
+        var keep = (uint)((1 - k) * 256);
+        var add = (uint)(k * 255);
+        for (var i = 0; i < Fb.Length; i++)
+        {
+            var c = Fb[i];
+            var r = ((c & 0xFF) * keep >> 8) + add;
+            var g = ((c >> 8) & 0xFF) * keep >> 8;
+            var b = ((c >> 16) & 0xFF) * keep >> 8;
+            Fb[i] = 0xFF000000u | (b << 16) | (g << 8) | r;
+        }
     }
 
     private void FillRect(int x, int y, int w, int h, uint color)

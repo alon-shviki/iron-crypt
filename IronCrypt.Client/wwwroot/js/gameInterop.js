@@ -60,6 +60,16 @@ window.gameInterop = {
         g._canvas.addEventListener('mousedown', e => { if (e.button === 0) g._fire = true; });
         window.addEventListener('mouseup', e => { if (e.button === 0) g._fire = false; });
         g._canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        // losing the mouse (Esc, alt-tab) while playing pauses the game; C# ignores the edge in menus
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement !== g._canvas) { g._pause = true; g._fire = false; }
+        });
+    },
+
+    // Menus need the cursor back.
+    releasePointer() {
+        if (document.pointerLockElement) document.exitPointerLock();
     },
 
     // One interop round-trip per frame: the input rides along with the Tick call.

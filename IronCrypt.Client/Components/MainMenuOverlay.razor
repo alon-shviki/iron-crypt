@@ -1,0 +1,50 @@
+<div class="menu-overlay">
+    <div class="menu-logo">IRON CRYPT</div>
+    @if (LoggedInUser != null)
+    {
+        <p class="menu-greeting">Welcome back, <span>@LoggedInUser</span>!</p>
+    }
+    else
+    {
+        <p class="menu-sub">Descend. Find the keys. Clear the garrison. Reach the exit.</p>
+    }
+    <span class="menu-tip-wrap">
+        <span class="menu-hint-chip">ⓘ How to play</span>
+        <span class="menu-tip"><b>WASD</b> move · <b>mouse</b> or <b>←/→</b> look · <b>click</b> or <b>Space</b> fire · <b>1/2/3</b> or <b>Q</b> weapons · <b>R</b> reload · <b>M</b> mute · <b>P</b>/<b>Esc</b> pause. Doors open as you approach; colored doors need their key. On a phone: left thumb moves, right thumb looks.</span>
+    </span>
+    <div class="menu-seed">
+        <label for="seed">Seed</label>
+        <input id="seed" maxlength="24" placeholder="random" autocomplete="off" spellcheck="false" @bind="_seed" @bind:event="oninput" />
+    </div>
+    <div class="menu-buttons">
+        <span class="menu-tip-wrap">
+            <button class="btn-normal" data-lock @onclick="() => OnStart.InvokeAsync(_seed)">Start Game</button>
+            <span class="menu-tip">Leave the seed empty for a fresh crypt, or type any word or number to replay the same one.</span>
+        </span>
+        <span class="menu-tip-wrap">
+            <button @onclick="OnLeaderboard">Leaderboard</button>
+            <span class="menu-tip">Top scores across every player.</span>
+        </span>
+    </div>
+    @if (LoggedInUser != null)
+    {
+        <div class="signed-in-badge"><span class="signed-in-dot"></span>Signed in as <b>@LoggedInUser</b></div>
+    }
+    else
+    {
+        <p class="menu-sub" style="font-size:0.85rem;color:#64748b">Sign in at the portal to save scores</p>
+    }
+    @if (HighScore > 0)
+    {
+        <p class="menu-best">Best score: @HighScore.ToString("N0")</p>
+    }
+</div>
+
+@code {
+    [Parameter] public string? LoggedInUser { get; set; }
+    [Parameter] public int HighScore { get; set; }
+    [Parameter] public EventCallback<string> OnStart { get; set; }
+    [Parameter] public EventCallback OnLeaderboard { get; set; }
+
+    private string _seed = "";
+}

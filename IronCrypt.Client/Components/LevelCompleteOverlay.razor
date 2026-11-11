@@ -1,0 +1,17 @@
+<div class="menu-overlay">
+    <h1 style="color:#4ade80">DEPTH @Depth CLEARED</h1>
+    <p style="color:#94a3b8">@Kills kills &nbsp;|&nbsp; +@Bonus.ToString("N0") bonus</p>
+    <p style="color:#ffffff">Score: @Score.ToString("N0")</p>
+    <div class="menu-buttons">
+        <button class="btn-normal" data-lock @onclick="OnContinue">Descend →</button>
+    </div>
+    <p class="menu-sub" style="font-size:0.85rem;color:#64748b">It gets worse down there.</p>
+</div>
+
+@code {
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public int Kills { get; set; }
+    [Parameter] public int Bonus { get; set; }
+    [Parameter] public int Score { get; set; }
+    [Parameter] public EventCallback OnContinue { get; set; }
+}
