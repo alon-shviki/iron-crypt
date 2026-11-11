@@ -1,0 +1,15 @@
+<div class="menu-overlay">
+    <h1 style="color:#fde68a">PAUSED</h1>
+    <p style="color:#94a3b8">Depth @Depth &nbsp;|&nbsp; Seed @Seed</p>
+    <div class="menu-buttons">
+        <button class="btn-normal" data-lock @onclick="OnResume">Resume</button>
+        <button @onclick="OnMainMenu">Main Menu</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Depth { get; set; }
+    [Parameter] public int Seed { get; set; }
+    [Parameter] public EventCallback OnResume { get; set; }
+    [Parameter] public EventCallback OnMainMenu { get; set; }
+}

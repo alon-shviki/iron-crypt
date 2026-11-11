@@ -3,12 +3,209 @@
 html, body {
     height: 100%;
     overflow: hidden;
+    touch-action: manipulation;       /* no double-tap zoom on phones */
+    -webkit-user-select: none; user-select: none;
+    overscroll-behavior: none;
     background: #07060a;
     color: #e2e8f0;
     font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
 .game-container { position: relative; width: 100vw; height: 100vh; }
+
+canvas#view {
+    display: block; width: 100vw; height: 100vh;
+    image-rendering: pixelated;   /* low-res framebuffer, upscaled crisp */
+    touch-action: none; cursor: crosshair;
+}
+
+.hud-fps {
+    position: absolute; top: 6px; left: 8px; z-index: 5;
+    font: 11px monospace; color: #64748b; pointer-events: none;
+}
+
+.hud-mute {
+    position: absolute; top: 4px; left: 64px; z-index: 6;
+    background: none; border: none; cursor: pointer;
+    font-size: 16px; line-height: 1; padding: 2px 6px; opacity: 0.75;
+}
+.hud-mute:hover { opacity: 1; }
+
+.hud-top {
+    position: absolute; top: 22px; left: 8px; z-index: 5;
+    font: bold 12px monospace; color: #cbd5e1; pointer-events: none;
+    text-shadow: 0 1px 2px #000;
+}
+
+.hud-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
+    display: flex; justify-content: center; gap: 28px;
+    padding: 8px 12px;
+    font: bold 18px monospace; pointer-events: none;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+    text-shadow: 0 1px 2px #000;
+}
+.hud-health { color: #f87171; }
+.hud-armor { color: #4ade80; }
+.hud-ammo { color: #fde68a; }
+.hud-score { color: #e2e8f0; }
+
+.hud-msg {
+    position: absolute; top: 22%; left: 0; right: 0; z-index: 5;
+    text-align: center; font: bold 18px monospace; color: #fde68a; pointer-events: none;
+    text-shadow: 0 2px 4px #000;
+}
+
+.hud-user {
+    position: absolute; top: 152px; right: 8px; z-index: 5;
+    font: bold 12px monospace; color: #fbbf24; pointer-events: none;
+    text-shadow: 0 1px 2px #000;
+}
+
+.menu-overlay {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px;
+    background: rgba(7, 5, 8, 0.80);
+    text-align: center;
+}
+
+.menu-logo {
+    font-size: 3.2rem; font-weight: 800; letter-spacing: 0.35em;
+    color: #ef4444;
+    text-shadow: 0 0 30px rgba(239, 68, 68, 0.55);
+}
+
+.menu-sub { color: #94a3b8; }
+.menu-best { color: #f59e0b; font-family: monospace; }
+.menu-greeting span { color: #fbbf24; }
+
+.menu-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 10px; }
+
+.menu-seed { display: flex; align-items: center; gap: 10px; color: #94a3b8; font-family: monospace; }
+.menu-seed input {
+    width: 190px; padding: 8px 12px;
+    background: #140b0d; color: #fde68a;
+    border: 1px solid #7f1d1d; border-radius: 6px;
+    font: 1rem monospace; text-align: center;
+}
+.menu-seed input:focus { outline: 2px solid #ef4444; }
+
+.menu-buttons button, .btn-back {
+    padding: 12px 28px;
+    font-size: 1rem; font-weight: 700;
+    border: 1px solid #7f1d1d; border-radius: 8px;
+    background: #2a1215; color: #e2e8f0;
+    cursor: pointer;
+}
+.menu-buttons button:hover, .btn-back:hover { background: #451a1a; }
+.btn-normal { border-color: #ef4444 !important; }
+
+/* Hover tooltips — controls + per-mode blurbs pop up instead of cluttering the menu */
+.menu-tip-wrap { position: relative; display: inline-flex; }
+
+.menu-hint-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 16px;
+    font-size: 0.85rem; color: #ef4444;
+    border: 1px dashed #7f1d1d; border-radius: 999px;
+    cursor: help;
+}
+.menu-hint-chip:hover { background: rgba(239, 68, 68, 0.12); }
+
+.menu-tip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 230px;
+    padding: 10px 14px;
+    background: #140b0d;
+    border: 1px solid #7f1d1d;
+    border-radius: 8px;
+    color: #cbd5e1;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 0.8rem; font-weight: 400; line-height: 1.45;
+    text-align: center;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.12s ease;
+    z-index: 20; pointer-events: none;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+.menu-tip b { color: #fbbf24; }
+.menu-tip::after {
+    content: "";
+    position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #7f1d1d;
+}
+.menu-tip-wrap:hover .menu-tip { opacity: 1; visibility: visible; }
+
+.overlay-panel {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column;
+    background: rgba(7, 5, 8, 0.93);
+}
+
+.panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.panel-title { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.25em; color: #ef4444; }
+
+.leaderboard-table {
+    width: 100%; max-width: 640px; margin: 0 auto;
+    border-collapse: collapse; font-family: monospace;
+}
+.leaderboard-table th, .leaderboard-table td {
+    padding: 8px 14px; text-align: left;
+    border-bottom: 1px solid #1e293b;
+}
+.leaderboard-table th { color: #64748b; font-size: 0.8rem; text-transform: uppercase; }
+.rank-gold   { color: #fbbf24; }
+.rank-silver { color: #cbd5e1; }
+.rank-bronze { color: #d97706; }
+.row-self td { background: rgba(239, 68, 68, 0.15); }
+
+.personal-best { margin-top: 8px; }
+.personal-best-title { color: #64748b; font-size: 0.75rem; letter-spacing: 0.2em; margin-bottom: 6px; }
+.personal-best-table { border-collapse: collapse; font-family: monospace; font-size: 0.85rem; }
+.personal-best-table td { padding: 3px 12px; color: #94a3b8; }
+
+.signed-in-badge {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 6px; font-size: 0.85rem; color: #94a3b8;
+}
+.signed-in-badge b { color: #fbbf24; }
+.signed-in-dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+
+/* ── touch controls: hidden until the first touch adds body.touch ── */
+.touch-controls { display: none; }
+body.touch .touch-controls { display: block; }
+body.touch canvas#view { cursor: none; }
+.touch-controls button {
+    position: absolute; z-index: 6;
+    border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35);
+    background: rgba(20, 11, 13, 0.45); color: #fde68a;
+    font: bold 15px monospace; touch-action: none;
+}
+.touch-fire { right: 22px; bottom: 64px; width: 92px; height: 92px; border-color: rgba(239, 68, 68, 0.7) !important; }
+.touch-weapon { right: 126px; bottom: 58px; width: 58px; height: 58px; font-size: 22px !important; }
+.touch-pause { right: 12px; top: 158px; width: 44px; height: 44px; }
+
+/* small screens: the title must fit a phone held upright */
+@media (max-width: 640px) {
+    .menu-logo { font-size: 1.9rem; letter-spacing: 0.2em; }
+    .menu-overlay { padding: 0 14px; }
+    .menu-overlay h1 { font-size: 1.6rem; }
+    .menu-buttons button, .btn-back { padding: 10px 18px; }
+    .hud-bar { gap: 14px; font-size: 15px; }
+    .menu-tip { width: 210px; }
+    .leaderboard-table th, .leaderboard-table td { padding: 6px 6px; font-size: 0.8rem; }
+}
 
 .loading-progress-text {
     position: absolute; inset: 0;

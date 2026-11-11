@@ -1,5 +1,362 @@
 @page "/"
+@inject IJSRuntime JS
+@inject HttpClient Http
+@using System.Net.Http.Headers
+@implements IDisposable
 
 <PageTitle>Iron Crypt</PageTitle>
 
-<div class="game-container"></div>
+<div class="game-container">
+    <canvas id="view" data-lock></canvas>
+
+    <div class="hud-fps">@_fpsText</div>
+    <button class="hud-mute" title="Mute (M)" @onclick="ToggleMute">@(_muted ? "🔇" : "🔊")</button>
+
+    @if (_state is GameState.Playing or GameState.Paused or GameState.LevelDone)
+    {
+        <div class="hud-top">@_hudText</div>
+        <div class="hud-user">@_hudUserText</div>
+        <div class="hud-bar">
+            <span class="hud-health">✚ @_engine.Health</span>
+            <span class="hud-armor">⛨ @_engine.Armor</span>
+            <span class="hud-ammo">@_ammoText</span>
+            <span class="hud-score">@_engine.Score.ToString("N0")</span>
+        </div>
+        @if (_state == GameState.Playing && _engine.MessageTime > 0)
+        {
+            <div class="hud-msg">@_engine.Message</div>
+        }
+        @if (_state == GameState.Playing)
+        {
+            @* shown only on touch devices (body.touch) — gameInterop.js reads the data-touch attributes *@
+            <div class="touch-controls">
+                <button class="touch-pause" data-touch="pause">❙❙</button>
+                <button class="touch-weapon" data-touch="weapon">⇄</button>
+                <button class="touch-fire" data-touch="fire">FIRE</button>
+            </div>
+        }
+    }
+
+    @if (_state == GameState.MainMenu)
+    {
+        <MainMenuOverlay LoggedInUser="@_loggedInUser" HighScore="@_highScore"
+                         OnStart="StartGame" OnLeaderboard="ShowLeaderboard" />
+    }
+
+    @if (_state == GameState.Paused)
+    {
+        <PauseOverlay Depth="@_engine.Depth" Seed="@_engine.Seed" OnResume="Resume" OnMainMenu="BackToMenu" />
+    }
+
+    @if (_state == GameState.LevelDone)
+    {
+        <LevelCompleteOverlay Depth="@_engine.Depth" Kills="@_engine.Kills" Bonus="@(Engine.LevelBonus * _engine.Depth)"
+                              Score="@_engine.Score" OnContinue="NextLevel" />
+    }
+
+    @if (_state == GameState.Leaderboard)
+    {
+        <LeaderboardOverlay Loading="@_leaderboardLoading" Entries="@_leaderboard" LoggedInUser="@_loggedInUser"
+                            OnBack="BackToMenu" />
+    }
+
+    @if (_state == GameState.GameOver)
+    {
+        <GameOverOverlay Depth="@_engine.Depth" Kills="@_engine.Kills" Seed="@_engine.Seed"
+                         Score="@_engine.Score" HighScore="@_highScore" LoggedInUser="@_loggedInUser" PersonalBest="@_personalBest"
+                         OnRetry="() => StartGame(_engine.Seed.ToString())" OnNewRun="@(() => StartGame(""))"
+                         OnLeaderboard="ShowLeaderboard" OnMainMenu="BackToMenu" />
+    }
+</div>
+
+@code {
+    private const double MouseSensitivity = 0.0025; // radians per pixel of mouse travel
+    private const double KeyTurnSpeed = 2.6;        // radians per second on ←/→
+    private const double ContinueDelay = 0.8;       // seconds before Fire can dismiss the level-complete screen
+
+    private IJSInProcessRuntime _js = default!;
+    private DotNetObjectReference<Game> _dotNetRef = default!;
+
+    private enum GameState { MainMenu, Playing, Paused, LevelDone, GameOver, Leaderboard }
+    private GameState _state = GameState.MainMenu;
+    private double _stateTime;
+
+    private string? _jwtToken;
+    private string? _loggedInUser;
+    private string _hudUserText = "";
+
+    private List<LeaderboardEntry>? _leaderboard;
+    private bool _leaderboardLoading;
+    private List<PersonalBestEntry>? _personalBest;
+
+    private readonly Engine _engine = new();
+    private readonly Renderer _renderer = new();
+    private int _highScore;
+    private bool _muted;
+
+    private double _lastTimestamp;
+    private bool _loopStarted;
+
+    // HUD strings — rebuilt only when a value they show changes, never per frame
+    private string _hudText = "";
+    private string _ammoText = "";
+    private object? _hudKey;
+    private string _fpsText = "";
+    private int _frames;
+    private double _fpsWindow;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _js = (IJSInProcessRuntime)JS;
+        _dotNetRef = DotNetObjectReference.Create(this);
+        _engine.NewGame(Random.Shared.Next(1, 1_000_000)); // backdrop for the title screen
+        _muted = _js.Invoke<bool>("gameInterop.isMuted");
+
+        var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "ic_highscore");
+        if (int.TryParse(saved, out var hs)) _highScore = hs;
+        var savedToken = await JS.InvokeAsync<string?>("localStorage.getItem", "jwt");
+        if (!string.IsNullOrEmpty(savedToken))
+        {
+            _jwtToken = savedToken;
+            _loggedInUser = ParseUsernameFromJwt(savedToken);
+            _hudUserText = _loggedInUser == null ? "" : $"◉ {_loggedInUser}";
+        }
+
+        await JS.InvokeVoidAsync("gameInterop.initInput");
+        await JS.InvokeVoidAsync("gameInterop.startLoop", _dotNetRef);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void Tick(double timestamp, double[] p)
+    {
+        if (!_loopStarted)
+        {
+            _loopStarted = true;
+            _lastTimestamp = timestamp;
+            return;
+        }
+        var dt = (timestamp - _lastTimestamp) / 1000.0;
+        _lastTimestamp = timestamp;
+        _stateTime += dt;
+
+        var (w, h) = Renderer.SizeFor(p[9], p[10]);
+        _renderer.Resize(w, h);
+        if (p[8] != 0) ToggleMute();
+
+        switch (_state)
+        {
+            case GameState.Playing:
+                if (p[7] != 0 || p[11] != 0) // P/Esc, or the tab/window/pointer lost focus
+                {
+                    Pause();
+                    return;
+                }
+                _engine.Tick(dt, new PlayerInput
+                {
+                    Forward = p[0],
+                    Strafe = p[1],
+                    Turn = p[2] * KeyTurnSpeed * Math.Min(dt, Engine.MaxDt) + p[3] * MouseSensitivity,
+                    Fire = p[4] != 0,
+                    Weapon = (int)p[5],
+                    Reload = p[6] != 0,
+                });
+                if (_engine.Dead) EndRun();
+                else if (_engine.LevelComplete) SetState(GameState.LevelDone);
+                break;
+
+            case GameState.Paused:
+                if (p[7] != 0) Resume();
+                return; // frozen frame stays on the canvas — nothing to simulate or draw
+
+            case GameState.LevelDone:
+                if (p[4] != 0 && _stateTime > ContinueDelay) NextLevel();
+                break;
+
+            case GameState.MainMenu:
+            case GameState.Leaderboard:
+                _engine.Angle += dt * 0.15; // slow look-around behind the menu
+                break;
+        }
+
+        // one call carries the finished frame and the ids of every sound the engine raised this tick
+        var sounds = _engine.Sounds.Count == 0 ? null : _engine.Sounds.Select(s => (int)s).ToArray();
+        _engine.Sounds.Clear();
+        _renderer.Overlay = _state is not (GameState.MainMenu or GameState.Leaderboard);
+        _js.InvokeVoid("gameInterop.present", _renderer.Render(_engine), _renderer.W, _renderer.H, sounds);
+
+        CountFrame(dt);
+        if (_state == GameState.Playing) RefreshHud();
+    }
+
+    private void SetState(GameState state)
+    {
+        _state = state;
+        _stateTime = 0;
+        _hudKey = null;
+        // menus need the mouse back; gameplay re-locks it from the click that starts or resumes
+        if (state != GameState.Playing) _js.InvokeVoid("gameInterop.releasePointer");
+        RefreshHud();
+        StateHasChanged();
+    }
+
+    private void RefreshHud()
+    {
+        var key = (_engine.Depth, _engine.HasRedKey, _engine.HasBlueKey, _engine.MessageTime > 0, _engine.Message,
+            _engine.Health, _engine.Armor, (_engine.Weapon, _engine.Mag[_engine.Weapon], _engine.Reserve, _engine.ReloadLeft > 0), _engine.Score);
+        if (key.Equals(_hudKey)) return;
+        _hudKey = key;
+        _hudText = $"Depth {_engine.Depth} · Seed {_engine.Seed}"
+            + (_engine.HasRedKey ? " · RED KEY" : "") + (_engine.HasBlueKey ? " · BLUE KEY" : "");
+        _ammoText = _engine.ReloadLeft > 0
+            ? $"{_engine.Gun.Name}  RELOADING"
+            : $"{_engine.Gun.Name}  {_engine.Mag[_engine.Weapon]} / {_engine.Reserve}";
+        StateHasChanged();
+    }
+
+    // FPS counter: one DOM update per second, never per frame
+    private void CountFrame(double dt)
+    {
+        _frames++;
+        _fpsWindow += dt;
+        if (_fpsWindow < 1) return;
+        _fpsText = $"{_frames / _fpsWindow:0} FPS";
+        _frames = 0;
+        _fpsWindow = 0;
+        StateHasChanged();
+    }
+
+    // ── flow ──
+
+    /// <summary>Empty seed text = a fresh random crypt; anything else replays that exact run.</summary>
+    private void StartGame(string seedText)
+    {
+        var seed = string.IsNullOrWhiteSpace(seedText) ? Random.Shared.Next(1, 1_000_000) : Engine.SeedFromText(seedText);
+        _engine.NewGame(seed);
+        _personalBest = null;
+        _js.InvokeVoid("gameInterop.setPaused", false);
+        StartMusic();
+        SetState(GameState.Playing);
+    }
+
+    private void NextLevel()
+    {
+        _engine.NextLevel();
+        StartMusic();
+        SetState(GameState.Playing);
+    }
+
+    private void Pause()
+    {
+        _js.InvokeVoid("gameInterop.setPaused", true);
+        SetState(GameState.Paused);
+    }
+
+    private void Resume()
+    {
+        _js.InvokeVoid("gameInterop.setPaused", false);
+        _loopStarted = false; // swallow the paused wall-clock time instead of feeding it to the sim
+        SetState(GameState.Playing);
+    }
+
+    private void BackToMenu()
+    {
+        _js.InvokeVoid("gameInterop.stopMusic");
+        _js.InvokeVoid("gameInterop.setPaused", false);
+        if (_state != GameState.Leaderboard) _engine.NewGame(Random.Shared.Next(1, 1_000_000)); // fresh backdrop
+        SetState(GameState.MainMenu);
+    }
+
+    private void EndRun()
+    {
+        _js.InvokeVoid("gameInterop.stopMusic");
+        if (_engine.Score > _highScore)
+        {
+            _highScore = _engine.Score;
+            _js.InvokeVoid("localStorage.setItem", "ic_highscore", _highScore.ToString());
+        }
+        SetState(GameState.GameOver);
+        if (_jwtToken != null) _ = SubmitAndRefreshAsync();
+    }
+
+    // each level gets its own generated track, derived from its seed
+    private void StartMusic() => _js.InvokeVoid("gameInterop.startMusic", Engine.LevelSeed(_engine.Seed, _engine.Depth));
+
+    private void ToggleMute()
+    {
+        _muted = _js.Invoke<bool>("gameInterop.toggleMute");
+        StateHasChanged();
+    }
+
+    // ── portal: scores + leaderboard (the portal auth server owns both) ──
+
+    private async Task ShowLeaderboard()
+    {
+        SetState(GameState.Leaderboard);
+        _leaderboardLoading = true;
+        _leaderboard = null;
+        StateHasChanged();
+        try
+        {
+            _leaderboard = await Http.GetFromJsonAsync<List<LeaderboardEntry>>("api/leaderboard");
+        }
+        catch { _leaderboard = null; }
+        _leaderboardLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task SubmitAndRefreshAsync()
+    {
+        await SubmitScoreAsync();
+        await FetchPersonalBestAsync();
+        StateHasChanged();
+    }
+
+    private async Task SubmitScoreAsync()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "api/scores")
+        {
+            Content = JsonContent.Create(new { Value = _engine.Score, Kills = _engine.Kills, Level = _engine.Depth })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _jwtToken);
+        try { await Http.SendAsync(request); }
+        catch { /* silent — score submission must never crash the game */ }
+    }
+
+    private async Task FetchPersonalBestAsync()
+    {
+        _personalBest = null;
+        var request = new HttpRequestMessage(HttpMethod.Get, "api/scores/me");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _jwtToken);
+        try
+        {
+            var resp = await Http.SendAsync(request);
+            if (resp.IsSuccessStatusCode)
+                _personalBest = await resp.Content.ReadFromJsonAsync<List<PersonalBestEntry>>();
+        }
+        catch { /* silent — the panel simply stays hidden */ }
+    }
+
+    private static string? ParseUsernameFromJwt(string? token)
+    {
+        if (token == null) return null;
+        var parts = token.Split('.');
+        if (parts.Length < 2) return null;
+        try
+        {
+            var payload = parts[1].Replace('-', '+').Replace('_', '/');
+            payload += new string('=', (4 - payload.Length % 4) % 4);
+            var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("unique_name", out var v) ? v.GetString() : null;
+        }
+        catch { return null; } // a malformed token just means "guest"
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        JS.InvokeVoidAsync("gameInterop.stopLoop");
+    }
+}

@@ -1,0 +1,51 @@
+<div class="overlay-panel">
+    <div class="panel-header">
+        <span class="panel-title">LEADERBOARD</span>
+        <button class="btn-back" @onclick="OnBack">← Back</button>
+    </div>
+    <div style="padding: 24px; overflow-y: auto; flex: 1;">
+        @if (Loading)
+        {
+            <p style="color:#64748b; font-family: monospace;">Loading...</p>
+        }
+        else if (Entries == null)
+        {
+            <p style="color:#ef4444; font-family: monospace;">Could not load leaderboard.</p>
+        }
+        else if (Entries.Count == 0)
+        {
+            <p style="color:#64748b; font-family: monospace;">No scores yet — be the first!</p>
+        }
+        else
+        {
+            <table class="leaderboard-table">
+                <thead>
+                    <tr><th>#</th><th>Player</th><th>Score</th><th>Kills</th><th>Depth</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Entries.Count; i++)
+                    {
+                        var entry = Entries[i];
+                        var rank = i + 1;
+                        var rankClass = rank == 1 ? "rank-gold" : rank == 2 ? "rank-silver" : rank == 3 ? "rank-bronze" : "";
+                        <tr class="@(entry.Username == LoggedInUser ? "row-self" : "")">
+                            <td class="@rankClass">@rank</td>
+                            <td>@entry.Username</td>
+                            <td>@entry.Value.ToString("N0")</td>
+                            <td>@entry.Kills</td>
+                            <td>@entry.Level</td>
+                            <td>@entry.PlayedAt.ToLocalTime().ToString("MMM d")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public List<LeaderboardEntry>? Entries { get; set; }
+    [Parameter] public string? LoggedInUser { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+}
