@@ -1,5 +1,97 @@
 @page "/"
+@inject IJSRuntime JS
+@implements IDisposable
 
 <PageTitle>Iron Crypt</PageTitle>
 
-<div class="game-container"></div>
+<div class="game-container">
+    <canvas id="view" data-lock></canvas>
+    <div class="hud-fps">@_fpsText</div>
+</div>
+
+@code {
+    private const double MouseSensitivity = 0.0025; // radians per pixel of mouse travel
+    private const double KeyTurnSpeed = 2.6;        // radians per second on ←/→
+
+    private IJSInProcessRuntime _js = default!;
+    private DotNetObjectReference<Game> _dotNetRef = default!;
+
+    private readonly Engine _engine = new();
+    private readonly Renderer _renderer = new();
+
+    private double _lastTimestamp;
+    private bool _loopStarted;
+
+    private string _fpsText = "";
+    private int _frames;
+    private double _fpsWindow;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _js = (IJSInProcessRuntime)JS;
+        _dotNetRef = DotNetObjectReference.Create(this);
+        _engine.LoadLevel(Level.FromRows(
+            "################",
+            "#S.....#.......#",
+            "#......#.......#",
+            "#......D.......#",
+            "#......#...##..#",
+            "#......#...##..#",
+            "####.###.......#",
+            "#..............#",
+            "#..##......X...#",
+            "################"));
+        await JS.InvokeVoidAsync("gameInterop.initInput");
+        await JS.InvokeVoidAsync("gameInterop.startLoop", _dotNetRef);
+    }
+
+    [JSInvokable]
+    public void Tick(double timestamp, double[] p)
+    {
+        if (!_loopStarted)
+        {
+            _loopStarted = true;
+            _lastTimestamp = timestamp;
+            return;
+        }
+        var dt = (timestamp - _lastTimestamp) / 1000.0;
+        _lastTimestamp = timestamp;
+
+        var (w, h) = Renderer.SizeFor(p[9], p[10]);
+        _renderer.Resize(w, h);
+
+        var input = new PlayerInput
+        {
+            Forward = p[0],
+            Strafe = p[1],
+            Turn = p[2] * KeyTurnSpeed * Math.Min(dt, Engine.MaxDt) + p[3] * MouseSensitivity,
+            Fire = p[4] != 0,
+            Weapon = (int)p[5],
+            Reload = p[6] != 0,
+        };
+        _engine.Tick(dt, input);
+        _engine.Sounds.Clear();
+
+        _js.InvokeVoid("gameInterop.present", _renderer.Render(_engine), _renderer.W, _renderer.H);
+        CountFrame(dt);
+    }
+
+    // FPS counter: one DOM update per second, never per frame
+    private void CountFrame(double dt)
+    {
+        _frames++;
+        _fpsWindow += dt;
+        if (_fpsWindow < 1) return;
+        _fpsText = $"{_frames / _fpsWindow:0} FPS";
+        _frames = 0;
+        _fpsWindow = 0;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        JS.InvokeVoidAsync("gameInterop.stopLoop");
+    }
+}

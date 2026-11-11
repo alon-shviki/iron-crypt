@@ -10,6 +10,17 @@ html, body {
 
 .game-container { position: relative; width: 100vw; height: 100vh; }
 
+canvas#view {
+    display: block; width: 100vw; height: 100vh;
+    image-rendering: pixelated;   /* low-res framebuffer, upscaled crisp */
+    touch-action: none; cursor: crosshair;
+}
+
+.hud-fps {
+    position: absolute; top: 6px; left: 8px; z-index: 5;
+    font: 11px monospace; color: #64748b; pointer-events: none;
+}
+
 .loading-progress-text {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
