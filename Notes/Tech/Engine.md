@@ -50,7 +50,7 @@ One interop call in, one out, per frame. The input array is documented above `re
 2. Chain room *i* → *i+1* with L-shaped corridors → everything is connected.
 3. A corridor cell that pierces a room's wall ring with solid jambs becomes a door (80%).
 4. Start = room 0. Exit = room farthest by walking distance.
-5. **Locks**: find a door whose removal cuts the start off from the exit → red door; drop the red key in the farthest room still reachable. From depth 2, repeat with the red key as the target → blue door + blue key. If no single door gates the target, the level simply has no lock (≈ under half of levels; a test asserts locks are the norm).
+5. **Locks**: find a door whose removal cuts the start off from the exit → red door; drop the red key in the farthest room still reachable. From depth 2, repeat with the red key as the target → blue door + blue key. If no single door gates the target, the level simply has no lock (a test asserts that most levels do have one).
 6. Pickups and enemies go on unused room cells; enemies at least `MinEnemyDistance` path cells from the start.
 
 Deterministic per `(seed, depth)`; the level seed is `seed * 31 + depth * 7919`.
