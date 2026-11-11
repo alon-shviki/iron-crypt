@@ -241,6 +241,140 @@ public class EngineTests
         Assert.Contains(Sfx.LevelDone, e.Sounds);
     }
 
+    // ── Phase 3: combat ──
+
+    private static readonly PlayerInput Fire = new() { Fire = true };
+
+    [Fact]
+    public void Firing_SpendsAmmo_AndRespectsTheCooldown()
+    {
+        var e = NewEngine();
+        e.Tick(0.016, Fire);
+        Assert.Equal(11, e.Mag[0]);
+        Assert.Contains(Sfx.Pistol, e.Sounds);
+        Assert.True(e.MuzzleFlash > 0);
+        Assert.True(e.Recoil > 0);
+
+        e.Tick(0.016, Fire); // still cooling down
+        Assert.Equal(11, e.Mag[0]);
+        Run(e, 1.0, Fire);   // 0.32 s per shot
+        Assert.InRange(e.Mag[0], 7, 9);
+    }
+
+    [Fact]
+    public void EmptyMagazine_AutoReloads_AfterTheReloadTime()
+    {
+        var e = NewEngine();
+        e.Mag[0] = 1;
+        var reserve = e.Bullets;
+        e.Tick(0.016, Fire);
+        Assert.Equal(0, e.Mag[0]);
+        Assert.True(e.ReloadLeft > 0);
+        Assert.Contains(Sfx.Reload, e.Sounds);
+
+        Run(e, 0.5, Fire); // mid-reload: cannot fire
+        Assert.Equal(0, e.Mag[0]);
+        Run(e, 0.6, default);
+        Assert.Equal(12, e.Mag[0]);
+        Assert.Equal(reserve - 12, e.Bullets);
+    }
+
+    [Fact]
+    public void Pistol_IsNeverDry_ButOtherGunsNeedAmmo()
+    {
+        var e = NewEngine();
+        e.Bullets = 0;
+        e.Mag[0] = 0;
+        Assert.True(e.StartReload());
+        Run(e, 1.1, default);
+        Assert.Equal(12, e.Mag[0]);
+        Assert.Equal(0, e.Bullets);
+
+        e.Owned[1] = true;
+        e.Tick(0.016, new PlayerInput { Weapon = 2 });
+        Run(e, 0.5, default);
+        Assert.Equal(1, e.Weapon);
+        e.Mag[1] = 0;
+        e.Shells = 0;
+        e.Sounds.Clear();
+        e.Tick(0.016, Fire);
+        Assert.Contains(Sfx.Empty, e.Sounds);
+        Assert.False(e.ReloadLeft > 0);
+    }
+
+    [Fact]
+    public void WeaponSelect_OnlyOwnedWeapons_AndCycleSkipsTheRest()
+    {
+        var e = NewEngine();
+        e.Tick(0.016, new PlayerInput { Weapon = 3 });
+        Assert.Equal(0, e.Weapon); // chaingun not owned
+
+        e.Owned[2] = true;
+        e.Tick(0.016, new PlayerInput { Weapon = -1 });
+        Assert.Equal(2, e.Weapon); // cycle skips the unowned shotgun
+        Assert.True(e.SwitchLeft > 0);
+        var mag = e.Mag[2];
+        e.Tick(0.016, Fire);       // cannot fire while the weapon is coming up
+        Assert.Equal(mag, e.Mag[2]);
+    }
+
+    [Fact]
+    public void Pickups_Apply_AndStayOnTheFloorWhenFull()
+    {
+        var e = NewEngine();
+        void Drop(PickupKind k) => e.Pickups.Add(new Pickup { Kind = k, X = e.Px, Y = e.Py });
+
+        Drop(PickupKind.Health); // already at full health
+        e.Tick(0.016, default);
+        Assert.Single(e.Pickups);
+
+        e.Hurt(40);
+        e.Tick(0.016, default);
+        Assert.Empty(e.Pickups);
+        Assert.Equal(85, e.Health);
+
+        Drop(PickupKind.Shotgun);
+        e.Tick(0.016, default);
+        Assert.True(e.Owned[1]);
+        Assert.Equal(1, e.Weapon);
+        Assert.Equal(8, e.Shells);
+        Assert.Contains(Sfx.WeaponGet, e.Sounds);
+
+        Drop(PickupKind.Armor);
+        Drop(PickupKind.Bullets);
+        Drop(PickupKind.Shells);
+        e.Tick(0.016, default);
+        Assert.Empty(e.Pickups);
+        Assert.Equal((50, 66, 16), (e.Armor, e.Bullets, e.Shells));
+    }
+
+    [Fact]
+    public void Armor_SoaksHalfTheDamage_AndDeathStopsTheSim()
+    {
+        var e = NewEngine();
+        e.Armor = 10;
+        e.Hurt(40); // armor takes min(10, 20) = 10
+        Assert.Equal((70, 0), (e.Health, e.Armor));
+        Assert.True(e.HurtFlash > 0);
+
+        e.Hurt(500);
+        Assert.True(e.Dead);
+        Assert.Contains(Sfx.PlayerDie, e.Sounds);
+        var x = e.Px;
+        Run(e, 1, new PlayerInput { Forward = 1 });
+        Assert.Equal(x, e.Px);
+    }
+
+    [Fact]
+    public void Bullets_StopAtWallsAndClosedDoors()
+    {
+        var e = NewEngine("########", "#S...D.#", "########");
+        Assert.Equal(3.5, e.RayToWall(0), 3);        // closed door at x = 5
+        e.Level.DoorOpen[1 * 8 + 5] = 1f;
+        Assert.Equal(5.5, e.RayToWall(0), 3);        // through the open door to the wall at x = 7
+        Assert.Equal(0.5, e.RayToWall(Math.PI), 3);  // wall right behind
+    }
+
     // ── Renderer ──
 
     [Fact]

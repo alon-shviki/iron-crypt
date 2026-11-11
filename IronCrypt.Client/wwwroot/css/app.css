@@ -27,6 +27,19 @@ canvas#view {
     text-shadow: 0 1px 2px #000;
 }
 
+.hud-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
+    display: flex; justify-content: center; gap: 28px;
+    padding: 8px 12px;
+    font: bold 18px monospace; pointer-events: none;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+    text-shadow: 0 1px 2px #000;
+}
+.hud-health { color: #f87171; }
+.hud-armor { color: #4ade80; }
+.hud-ammo { color: #fde68a; }
+.hud-score { color: #e2e8f0; }
+
 .hud-msg {
     position: absolute; top: 22%; left: 0; right: 0; z-index: 5;
     text-align: center; font: bold 18px monospace; color: #fde68a; pointer-events: none;

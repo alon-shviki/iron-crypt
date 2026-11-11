@@ -30,6 +30,7 @@ public partial class Renderer
             _ceil[l] = Art.Scale(Art.Rgb(44, 42, 52), Art.Brightness(l));
         }
         InitSprites();
+        InitWeapons();
         Resize(w, h);
     }
 
@@ -61,6 +62,7 @@ public partial class Renderer
         DrawFloorAndCeiling(horizon, scale);
         DrawWalls(e, horizon, scale);
         DrawSprites(e, horizon, scale);
+        DrawWeapon(e);
         DrawMinimap(e);
 
         Buffer.BlockCopy(Fb, 0, Pixels, 0, Pixels.Length);

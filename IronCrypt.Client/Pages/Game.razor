@@ -8,6 +8,12 @@
     <canvas id="view" data-lock></canvas>
     <div class="hud-fps">@_fpsText</div>
     <div class="hud-top">@_hudText</div>
+    <div class="hud-bar">
+        <span class="hud-health">✚ @_engine.Health</span>
+        <span class="hud-armor">⛨ @_engine.Armor</span>
+        <span class="hud-ammo">@_ammoText</span>
+        <span class="hud-score">@_engine.Score.ToString("N0")</span>
+    </div>
     @if (_engine.MessageTime > 0)
     {
         <div class="hud-msg">@_engine.Message</div>
@@ -28,6 +34,7 @@
     private bool _loopStarted;
 
     private string _hudText = "";
+    private string _ammoText = "";
     private object? _hudKey;
     private string _fpsText = "";
     private int _frames;
@@ -79,11 +86,15 @@
     // HUD lives in the DOM; re-render only when something it shows actually changed
     private void RefreshHud()
     {
-        var key = (_engine.Depth, _engine.HasRedKey, _engine.HasBlueKey, _engine.MessageTime > 0, _engine.Message);
+        var key = (_engine.Depth, _engine.HasRedKey, _engine.HasBlueKey, _engine.MessageTime > 0, _engine.Message,
+            _engine.Health, _engine.Armor, (_engine.Weapon, _engine.Mag[_engine.Weapon], _engine.Reserve, _engine.ReloadLeft > 0), _engine.Score);
         if (key.Equals(_hudKey)) return;
         _hudKey = key;
         _hudText = $"Depth {_engine.Depth} · Seed {_engine.Seed}"
             + (_engine.HasRedKey ? " · RED KEY" : "") + (_engine.HasBlueKey ? " · BLUE KEY" : "");
+        _ammoText = _engine.ReloadLeft > 0
+            ? $"{_engine.Gun.Name}  RELOADING"
+            : $"{_engine.Gun.Name}  {_engine.Mag[_engine.Weapon]} / {_engine.Reserve}";
         StateHasChanged();
     }
 
