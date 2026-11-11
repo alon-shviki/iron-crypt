@@ -3,6 +3,9 @@
 html, body {
     height: 100%;
     overflow: hidden;
+    touch-action: manipulation;       /* no double-tap zoom on phones */
+    -webkit-user-select: none; user-select: none;
+    overscroll-behavior: none;
     background: #07060a;
     color: #e2e8f0;
     font-family: 'Segoe UI', system-ui, sans-serif;
@@ -178,6 +181,31 @@ canvas#view {
 }
 .signed-in-badge b { color: #fbbf24; }
 .signed-in-dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+
+/* ── touch controls: hidden until the first touch adds body.touch ── */
+.touch-controls { display: none; }
+body.touch .touch-controls { display: block; }
+body.touch canvas#view { cursor: none; }
+.touch-controls button {
+    position: absolute; z-index: 6;
+    border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35);
+    background: rgba(20, 11, 13, 0.45); color: #fde68a;
+    font: bold 15px monospace; touch-action: none;
+}
+.touch-fire { right: 22px; bottom: 64px; width: 92px; height: 92px; border-color: rgba(239, 68, 68, 0.7) !important; }
+.touch-weapon { right: 126px; bottom: 58px; width: 58px; height: 58px; font-size: 22px !important; }
+.touch-pause { right: 12px; top: 158px; width: 44px; height: 44px; }
+
+/* small screens: the title must fit a phone held upright */
+@media (max-width: 640px) {
+    .menu-logo { font-size: 1.9rem; letter-spacing: 0.2em; }
+    .menu-overlay { padding: 0 14px; }
+    .menu-overlay h1 { font-size: 1.6rem; }
+    .menu-buttons button, .btn-back { padding: 10px 18px; }
+    .hud-bar { gap: 14px; font-size: 15px; }
+    .menu-tip { width: 210px; }
+    .leaderboard-table th, .leaderboard-table td { padding: 6px 6px; font-size: 0.8rem; }
+}
 
 .loading-progress-text {
     position: absolute; inset: 0;

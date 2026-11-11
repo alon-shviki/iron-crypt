@@ -26,6 +26,15 @@
         {
             <div class="hud-msg">@_engine.Message</div>
         }
+        @if (_state == GameState.Playing)
+        {
+            @* shown only on touch devices (body.touch) — gameInterop.js reads the data-touch attributes *@
+            <div class="touch-controls">
+                <button class="touch-pause" data-touch="pause">❙❙</button>
+                <button class="touch-weapon" data-touch="weapon">⇄</button>
+                <button class="touch-fire" data-touch="fire">FIRE</button>
+            </div>
+        }
     }
 
     @if (_state == GameState.MainMenu)
@@ -139,7 +148,7 @@
         switch (_state)
         {
             case GameState.Playing:
-                if (p[7] != 0)
+                if (p[7] != 0 || p[11] != 0) // P/Esc, or the tab/window/pointer lost focus
                 {
                     Pause();
                     return;

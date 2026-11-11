@@ -6,6 +6,10 @@ window.gameInterop = {
     _reload: false,   // edge
     _pause: false,    // edge
     _mute: false,     // edge
+    _forcePause: false, // edge: focus/tab/pointer lost — pauses but never un-pauses
+    _touch: false,    // set on the first touch; switches the UI to touch controls
+    _tf: 0, _ts: 0,   // touch stick: forward / strafe, -1..1
+    _moveId: null, _lookId: null, _fireId: null, _mx: 0, _my: 0, _lx: 0,
     _canvas: null, _ctx: null, _img: null,
 
     startLoop(dotnetRef) {
@@ -63,8 +67,72 @@ window.gameInterop = {
 
         // losing the mouse (Esc, alt-tab) while playing pauses the game; C# ignores the edge in menus
         document.addEventListener('pointerlockchange', () => {
-            if (document.pointerLockElement !== g._canvas) { g._pause = true; g._fire = false; }
+            if (document.pointerLockElement !== g._canvas) { g._forcePause = true; g._fire = false; }
         });
+
+        // tab hidden or window unfocused → pause. Held keys are dropped so nothing is "stuck down" on return.
+        const lostFocus = () => { g._forcePause = true; g._keys = {}; g._fire = false; g._tf = g._ts = 0; };
+        window.addEventListener('blur', lostFocus);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) return;
+            lostFocus();
+            if (g._ac) g._ac.suspend(); // rAF stops while hidden, so silence the music here rather than waiting for C#
+        });
+
+        g.initTouch();
+    },
+
+    // Touch: left half of the screen is a floating move stick, right half drags to look.
+    // On-screen buttons carry data-touch="fire|weapon|pause"; the FIRE thumb can keep dragging to aim.
+    initTouch() {
+        const g = window.gameInterop;
+        const STICK = 55, LOOK = 2.4; // stick radius in px; look speed relative to mouse pixels
+        document.addEventListener('touchstart', e => {
+            if (!g._touch) { g._touch = true; document.body.classList.add('touch'); }
+            for (const t of e.changedTouches) {
+                const btn = t.target.closest && t.target.closest('[data-touch]');
+                if (btn) {
+                    const kind = btn.dataset.touch;
+                    if (kind === 'weapon') g._weapon = -1;
+                    if (kind === 'pause') g._pause = true;
+                    if (kind === 'fire') {
+                        g._fire = true;
+                        g._fireId = t.identifier;
+                        if (g._lookId === null) { g._lookId = t.identifier; g._lx = t.clientX; }
+                    }
+                    e.preventDefault();
+                    continue;
+                }
+                if (t.target !== g._canvas) continue; // menus and overlays handle their own taps
+                if (t.clientX < window.innerWidth / 2 && g._moveId === null) {
+                    g._moveId = t.identifier; g._mx = t.clientX; g._my = t.clientY;
+                } else if (g._lookId === null) {
+                    g._lookId = t.identifier; g._lx = t.clientX;
+                }
+                e.preventDefault();
+            }
+        }, { passive: false });
+        document.addEventListener('touchmove', e => {
+            for (const t of e.changedTouches) {
+                if (t.identifier === g._moveId) {
+                    g._ts = Math.max(-1, Math.min(1, (t.clientX - g._mx) / STICK));
+                    g._tf = Math.max(-1, Math.min(1, (g._my - t.clientY) / STICK));
+                }
+                if (t.identifier === g._lookId) {
+                    g._mouseDx += (t.clientX - g._lx) * LOOK;
+                    g._lx = t.clientX;
+                }
+            }
+        }, { passive: true });
+        const end = e => {
+            for (const t of e.changedTouches) {
+                if (t.identifier === g._moveId) { g._moveId = null; g._tf = g._ts = 0; }
+                if (t.identifier === g._lookId) g._lookId = null;
+                if (t.identifier === g._fireId) { g._fireId = null; g._fire = false; }
+            }
+        };
+        document.addEventListener('touchend', end);
+        document.addEventListener('touchcancel', end);
     },
 
     // Menus need the cursor back.
@@ -73,11 +141,11 @@ window.gameInterop = {
     },
 
     // One interop round-trip per frame: the input rides along with the Tick call.
-    // [forward, strafe, keyTurn, mouseDx, fire, weaponEdge, reloadEdge, pauseEdge, muteEdge, viewW, viewH]
+    // [forward, strafe, keyTurn, mouseDx, fire, weaponEdge, reloadEdge, pauseEdge, muteEdge, viewW, viewH, forcePauseEdge]
     readInput() {
         const g = window.gameInterop;
         const k = g._keys;
-        let fwd = 0, strafe = 0, turn = 0;
+        let fwd = g._tf, strafe = g._ts, turn = 0;
         if (k['KeyW'] || k['ArrowUp']) fwd += 1;
         if (k['KeyS'] || k['ArrowDown']) fwd -= 1;
         if (k['KeyD']) strafe += 1;
@@ -86,10 +154,11 @@ window.gameInterop = {
         if (k['ArrowLeft']) turn -= 1;
         const fire = g._fire || k['Space'] || k['ControlLeft'];
         const out = [fwd, strafe, turn, g._mouseDx, fire ? 1 : 0, g._weapon,
-            g._reload ? 1 : 0, g._pause ? 1 : 0, g._mute ? 1 : 0, window.innerWidth, window.innerHeight];
+            g._reload ? 1 : 0, g._pause ? 1 : 0, g._mute ? 1 : 0, window.innerWidth, window.innerHeight,
+            g._forcePause ? 1 : 0];
         g._mouseDx = 0;
         g._weapon = 0;
-        g._reload = g._pause = g._mute = false;
+        g._reload = g._pause = g._mute = g._forcePause = false;
         return out;
     },
 
