@@ -7,6 +7,7 @@
 <div class="game-container">
     <canvas id="view" data-lock></canvas>
     <div class="hud-fps">@_fpsText</div>
+    <button class="hud-mute" title="Mute (M)" @onclick="ToggleMute">@(_muted ? "🔇" : "🔊")</button>
     <div class="hud-top">@_hudText</div>
     <div class="hud-bar">
         <span class="hud-health">✚ @_engine.Health</span>
@@ -35,6 +36,7 @@
 
     private string _hudText = "";
     private string _ammoText = "";
+    private bool _muted;
     private object? _hudKey;
     private string _fpsText = "";
     private int _frames;
@@ -46,6 +48,8 @@
         _js = (IJSInProcessRuntime)JS;
         _dotNetRef = DotNetObjectReference.Create(this);
         _engine.NewGame(Random.Shared.Next(1, 1_000_000));
+        _muted = _js.Invoke<bool>("gameInterop.isMuted");
+        StartMusic();
         await JS.InvokeVoidAsync("gameInterop.initInput");
         await JS.InvokeVoidAsync("gameInterop.startLoop", _dotNetRef);
     }
@@ -74,11 +78,19 @@
             Weapon = (int)p[5],
             Reload = p[6] != 0,
         };
+        if (p[8] != 0) ToggleMute();
         _engine.Tick(dt, input);
-        _engine.Sounds.Clear();
-        if (_engine.LevelComplete) _engine.NextLevel();
 
-        _js.InvokeVoid("gameInterop.present", _renderer.Render(_engine), _renderer.W, _renderer.H);
+        // one call carries the finished frame and the ids of every sound the engine raised this tick
+        var sounds = _engine.Sounds.Count == 0 ? null : _engine.Sounds.Select(s => (int)s).ToArray();
+        _engine.Sounds.Clear();
+        _js.InvokeVoid("gameInterop.present", _renderer.Render(_engine), _renderer.W, _renderer.H, sounds);
+
+        if (_engine.LevelComplete)
+        {
+            _engine.NextLevel();
+            StartMusic();
+        }
         CountFrame(dt);
         RefreshHud();
     }
@@ -96,6 +108,15 @@
             ? $"{_engine.Gun.Name}  RELOADING"
             : $"{_engine.Gun.Name}  {_engine.Mag[_engine.Weapon]} / {_engine.Reserve}";
         StateHasChanged();
+    }
+
+    // each level gets its own generated track, derived from its seed
+    private void StartMusic() => _js.InvokeVoid("gameInterop.startMusic", Engine.LevelSeed(_engine.Seed, _engine.Depth));
+
+    private void ToggleMute()
+    {
+        _muted = _js.Invoke<bool>("gameInterop.toggleMute");
+        _hudKey = null; // force a HUD refresh
     }
 
     // FPS counter: one DOM update per second, never per frame
