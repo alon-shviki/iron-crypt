@@ -30,7 +30,7 @@ No game engine, no asset files, no external services: wall textures, sprites, so
 dotnet run --project IronCrypt.Client
 ```
 
-Open the printed localhost URL — do not open `index.html` directly, the game requires an HTTP context. Scores stay local (`localStorage`) in this mode.
+Opens http://localhost:5310 (fixed in `Properties/launchSettings.json`, so it never collides with whatever else uses the .NET default port 5000) — do not open `index.html` directly, the game requires an HTTP context. Scores stay local (`localStorage`) in this mode.
 
 ### Run the full stack (with auth + leaderboard)
 

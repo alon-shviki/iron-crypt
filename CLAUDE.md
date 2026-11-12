@@ -5,7 +5,7 @@ Blazor WASM (.NET) first-person raycasting shooter. The C# engine raycasts into 
 ## Commands
 
 ```bash
-dotnet run --project IronCrypt.Client            # dev server (client-only, no portal)
+dotnet run --project IronCrypt.Client            # dev server → http://localhost:5310 (client-only, no portal)
 dotnet build IronCrypt.Client -c Release
 dotnet test IronCrypt.Tests -c Release           # headless engine tests
 docker build -f IronCrypt.Client/Dockerfile .    # nginx-served production image
