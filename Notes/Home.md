@@ -5,7 +5,7 @@ First-person raycasting shooter. Descend through procedurally generated crypts, 
 ## Quick Start
 
 ```bash
-dotnet run --project IronCrypt.Client   # client-only dev server (no portal — scores stay local)
+dotnet run --project IronCrypt.Client   # → http://localhost:5310, client-only (no portal — scores stay local)
 dotnet test IronCrypt.Tests             # headless engine tests
 ```
 
