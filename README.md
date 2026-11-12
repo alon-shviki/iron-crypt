@@ -6,16 +6,16 @@ No game engine, no asset files, no external services: wall textures, sprites, so
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Blazor WASM (.NET 10) |
-| Rendering | C# raycaster → RGBA framebuffer → one `putImageData` per frame (`gameInterop.js`) |
-| Game Loop | `requestAnimationFrame` → JS interop → C# `Tick` |
-| Simulation | Headless in `Game/` (no rendering/interop — directly testable) |
-| Audio | WebAudio synthesis in `gameInterop.js` — no audio files |
-| Auth / Scores / Leaderboard | Portal auth server — **no game-specific backend or database** |
-| Tests | xUnit (`IronCrypt.Tests`) — headless engine, generator and renderer tests |
-| Deployment | Docker (nginx-served WASM image) |
+| Layer                       | Technology                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| Frontend                    | Blazor WASM (.NET 10)                                                             |
+| Rendering                   | C# raycaster → RGBA framebuffer → one `putImageData` per frame (`gameInterop.js`) |
+| Game Loop                   | `requestAnimationFrame` → JS interop → C# `Tick`                                  |
+| Simulation                  | Headless in `Game/` (no rendering/interop — directly testable)                    |
+| Audio                       | WebAudio synthesis in `gameInterop.js` — no audio files                           |
+| Auth / Scores / Leaderboard | Portal auth server — **no game-specific backend or database**                     |
+| Tests                       | xUnit (`IronCrypt.Tests`) — headless engine, generator and renderer tests         |
+| Deployment                  | Docker (nginx-served WASM image)                                                  |
 
 ## Getting Started
 
@@ -56,15 +56,15 @@ CI (`.github/workflows/ci.yml`, a thin caller of the portal's reusable workflow)
 
 ## Controls
 
-| Action | Keyboard / mouse | Touch |
-|--------|------------------|-------|
-| Move | `W` `A` `S` `D` | left thumb — floating stick |
-| Look | mouse (click the game to capture it) or `←` `→` | right thumb — drag |
-| Fire | left click, `Space` or `Ctrl` | **FIRE** button (keep dragging to aim) |
-| Weapons | `1` `2` `3`, `Q` cycles | **⇄** button |
-| Reload | `R` (also automatic on empty) | automatic |
-| Pause | `P` / `Esc` (also automatic when the tab loses focus) | **❙❙** button |
-| Mute | `M` | speaker icon |
+| Action  | Keyboard / mouse                                      | Touch                                  |
+| ------- | ----------------------------------------------------- | -------------------------------------- |
+| Move    | `W` `A` `S` `D`                                       | left thumb — floating stick            |
+| Look    | mouse (click the game to capture it) or `←` `→`       | right thumb — drag                     |
+| Fire    | left click, `Space` or `Ctrl`                         | **FIRE** button (keep dragging to aim) |
+| Weapons | `1` `2` `3`, `Q` cycles                               | **⇄** button                           |
+| Reload  | `R` (also automatic on empty)                         | automatic                              |
+| Pause   | `P` / `Esc` (also automatic when the tab loses focus) | **❙❙** button                          |
+| Mute    | `M`                                                   | speaker icon                           |
 
 Doors open as you approach. Red and blue doors need the matching key.
 
