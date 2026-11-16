@@ -198,25 +198,31 @@ public static class LevelGenerator
         Drop(PickupKind.Bullets, rooms[0]);
         Drop(PickupKind.Shotgun, rooms[1 + rnd.Next(Math.Min(2, rooms.Count - 1))]); // early, so it is found
         if (depth >= 2) Drop(PickupKind.Chaingun, rooms[rnd.Next(1, rooms.Count)]);
+        if (depth >= 3) Drop(PickupKind.RocketLauncher, rooms[rnd.Next(1, rooms.Count)]);
         for (var i = 1; i < rooms.Count; i++)
         {
             if (rnd.Next(100) < 55) Drop(PickupKind.Bullets, rooms[i]);
             if (rnd.Next(100) < 35) Drop(PickupKind.Shells, rooms[i]);
             if (rnd.Next(100) < 40) Drop(PickupKind.Health, rooms[i]);
             if (rnd.Next(100) < 18) Drop(PickupKind.Armor, rooms[i]);
+            if (depth >= 3 && rnd.Next(100) < 22) Drop(PickupKind.Rockets, rooms[i]);
         }
 
         // ── enemies: more and nastier with depth, never close to the start ──
         var count = Math.Min(5 + depth * 3, 40);
         var tankChance = depth < 2 ? 0 : Math.Min(5 * depth, 25);
         var shooterChance = Math.Min(15 + 5 * depth, 45);
+        var chargerChance = depth < 2 ? 0 : Math.Min(4 * depth, 16);
         for (var attempt = 0; attempt < count * 6 && lvl.Enemies.Count < count; attempt++)
         {
             var room = rooms[rnd.Next(1, rooms.Count)];
             var cell = rnd.Next(room.Y, room.Y + room.H) * lvl.W + rnd.Next(room.X, room.X + room.W);
             if (open[cell] < MinEnemyDistance || !taken.Add(cell)) continue;
             var roll = rnd.Next(100);
-            var kind = roll < tankChance ? EnemyKind.Tank : roll < tankChance + shooterChance ? EnemyKind.Shooter : EnemyKind.Grunt;
+            var kind = roll < tankChance ? EnemyKind.Tank
+                : roll < tankChance + chargerChance ? EnemyKind.Charger
+                : roll < tankChance + chargerChance + shooterChance ? EnemyKind.Shooter
+                : EnemyKind.Grunt;
             lvl.Enemies.Add(new EnemySpawn(kind, cell % lvl.W + 0.5, cell / lvl.W + 0.5));
         }
     }

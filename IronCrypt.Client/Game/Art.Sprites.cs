@@ -98,8 +98,31 @@ public static partial class Art
                 for (var i = 0; i < 3; i++) p.Rect(2, 30 + i * 6, 36, 4, Rgb(84, 88, 98));
                 p.Rect(34, 26, 22, 22, Rgb(58, 60, 68)).Rect(42, 48, 8, 12, Rgb(40, 42, 48));
                 break;
+            case PickupKind.RocketLauncher:
+                p.Rect(4, 30, 52, 12, Rgb(70, 86, 64)).Rect(2, 28, 8, 16, Rgb(40, 48, 38)); // tube + flared muzzle
+                p.Rect(34, 42, 8, 14, Rgb(40, 42, 48)).Rect(50, 26, 8, 20, Rgb(50, 60, 46)); // grip + rear
+                break;
+            case PickupKind.Rockets:
+                for (var i = 0; i < 3; i++)
+                {
+                    p.Rect(12 + i * 15, 28, 9, 30, Rgb(200, 204, 212)).Ellipse(16 + i * 15, 27, 4.5, 8, Rgb(214, 60, 44));
+                    p.Rect(10 + i * 15, 52, 13, 6, Rgb(90, 94, 104));
+                }
+                break;
         }
         return p.Finish();
+    }
+
+    /// <summary>A rocket in flight, seen from behind: exhaust glow.</summary>
+    public static uint[] MissileSprite() =>
+        new Painter().Ellipse(32, 32, 30, 30, Rgb(255, 140, 30)).Ellipse(32, 32, 18, 18, Rgb(255, 220, 110)).Ellipse(32, 32, 8, 8, Rgb(255, 255, 240)).Px;
+
+    public static uint[] ExplosionSprite()
+    {
+        var p = new Painter();
+        p.Ellipse(32, 32, 31, 31, Rgb(190, 50, 20)).Ellipse(24, 26, 20, 20, Rgb(240, 110, 30)).Ellipse(40, 38, 18, 18, Rgb(240, 110, 30));
+        p.Ellipse(32, 32, 17, 17, Rgb(255, 200, 70)).Ellipse(30, 30, 8, 8, Rgb(255, 250, 220));
+        return p.Px;
     }
 
     /// <summary>The way down: a glowing green archway.</summary>

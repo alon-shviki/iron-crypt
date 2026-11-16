@@ -20,3 +20,9 @@ Product and technical choices that are not obvious from the code, with the reaso
 | **Fixed dev port 5310** | `dotnet run` otherwise used the .NET default 5000, which collides with other local services. Pinned in `Properties/launchSettings.json`. |
 | **`.dockerignore` in this repo** | Without it a local `docker build` copies host `obj/`, and `dotnet publish --no-restore` fails with NETSDK1064. CI is unaffected. |
 | **Compose dev port 8082** | 8080 = Bullet Heaven, 8081 = Orbit Break. |
+| **Y-shearing for up/down look** | True pitch needs a different renderer. Shearing is free and exact where the crosshair points, which is all aiming needs. |
+| **Level aim stays a body shot** | Players who never look up must not be punished; the head is a small step above level aim. |
+| **All bullets ricochet once** | One simple rule gives bank shots without a special weapon. Side effect accepted: a shot into a wall in front of you comes back past you. |
+| **Rockets hurt the player** | A power weapon needs a cost; it stops point-blank spam in corridors. |
+| **Chargers cannot steer** | The counter (sidestep, then punish the stun) has to be learnable from one encounter. |
+| **A door may close over a corpse** | Only living bodies hold doors open; corpses have no collision. |

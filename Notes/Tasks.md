@@ -12,6 +12,8 @@ Built from the owner's 8-phase plan (Nov 2026). New work goes in as GitHub issue
 - [x] Phase 7 — portal integration: nginx/compose/shell card/leaderboard tab; auto-resize, touch controls, pause on focus loss
 - [x] Phase 8 — testing: 44 headless tests incl. bot playthroughs; 60 FPS measured on the Release image
 
+- [x] Vertical look, headshots, trickshots (ricochets, long/spin shots, multi-kills), rocket launcher, charger enemy (issue #19)
+
 ## Next (open as issues when picked up)
 
 - Playtest on a real phone; tune touch stick radius and look speed

@@ -16,7 +16,8 @@ Full portal stack (auth + leaderboard): `cd ~/Desktop/game && docker compose up`
 ### Design
 - [[Design/Core Loop]] — loop, seeds, scoring
 - [[Design/Weapons]] — the three guns, magazines, reload rules
-- [[Design/Enemies]] — grunt, shooter, tank: stats and what each asks of you
+- [[Design/Enemies]] — grunt, shooter, tank, charger: stats and what each asks of you
+- [[Design/Trickshots]] — headshots, bank shots, spin shots, multi-kills and their bonuses
 - [[Design/Difficulty]] — per-depth curve and supply rates
 - [[Design/Level Design]] — rooms, doors, keys, exit, minimap
 - [[Design/Visual Identity]] — palette, rendering style, sprites

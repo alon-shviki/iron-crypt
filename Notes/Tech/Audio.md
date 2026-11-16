@@ -25,6 +25,8 @@ Ids follow the enum order in `Engine.cs`:
 | 6 | Empty | 15 | PlayerDie |
 | 7 | Reload | 16 | LevelDone |
 | 8 | Pickup | 17 | WeaponGet |
+| 18 | Rocket | 20 | Headshot |
+| 19 | Explosion | 21 | Trick |
 
 Two helpers build everything: `_tone(type, f0, f1, dur, vol, when, out, cutoff)` (an oscillator sweeping f0 to f1 with a fast decay and an optional low-pass) and `_noise(dur, vol, cutoff, type, when, out)` (filtered noise from a 1-second random buffer). Gunshots are noise plus a falling square tone; the door is a low saw plus noise; pickups and keys are short rising sines/arpeggios.
 
@@ -43,4 +45,4 @@ A 80 ms timer schedules notes 0.3 s ahead on the audio clock, the standard way t
 
 ## Verification status
 
-Automated checks confirmed all 18 effects run without errors, the music scheduler starts and stops, mute drives the gain to 0 and persists, and pause suspends the context. **Whether it sounds good has not been judged by a person** (GitHub issue open).
+Automated checks confirmed all 22 effects run without errors, the music scheduler starts and stops, mute drives the gain to 0 and persists, and pause suspends the context. **Whether it sounds good has not been judged by a person** (GitHub issue open).
