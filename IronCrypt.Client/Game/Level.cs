@@ -10,9 +10,9 @@ public static class Cell
     public static bool IsDoor(byte c) => c >= Door;
 }
 
-public enum EnemyKind { Grunt, Shooter, Tank }
+public enum EnemyKind { Grunt, Shooter, Tank, Charger }
 
-public enum PickupKind { Health, Armor, Bullets, Shells, Shotgun, Chaingun, KeyRed, KeyBlue }
+public enum PickupKind { Health, Armor, Bullets, Shells, Shotgun, Chaingun, KeyRed, KeyBlue, RocketLauncher, Rockets }
 
 public record struct EnemySpawn(EnemyKind Kind, double X, double Y);
 

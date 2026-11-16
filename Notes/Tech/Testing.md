@@ -18,6 +18,10 @@ CI (`ci / build`) runs format check, build, a vulnerable-package gate and these 
 | Seeds | text seeds are stable (own FNV-1a hash, not `string.GetHashCode`), levels differ by depth |
 | Combat | cooldowns, ammo, auto-reload, pistol never dry, weapon select and cycling, pickups apply (and stay on the floor when full), armor soaks half, death freezes the sim, bullets stop at walls and closed doors |
 | Enemies | nearest-target hitscan, no hits through walls or behind, sight vs wall, gunshot hearing, pathfinding round a wall, shooters need line of sight, plain vs locked doors, nothing ever inside a wall in a 40 s simulation per seed, depth scaling |
+| Vertical aim | pitch limits and the horizon moving, over-the-head misses, body vs headshot damage |
+| Trickshots | headshot bonus and callout, bank shot round a corner, weaker ricochet and only one bounce, long shot, spin shot (and that slow turning is not one), double kill |
+| Rockets | pickup and select, flight then explosion on a wall, splash falloff, line of sight, self damage, pitch (into the floor) |
+| Charger | telegraph then ram, sidestep makes it hit the wall and stun, generator depth gates |
 | Flow | level bonus grows with depth, a new game resets the run, blood falls and is capped |
 | Renderer | draws a textured wall, red flash and shake, works at desktop / portrait / landscape / ultrawide sizes with a sprite in the camera's face |
 | **Bot** | a scripted player walks 6 seeds × 4 depths to the exit, fetching keys in order, asserting it is never inside a wall |

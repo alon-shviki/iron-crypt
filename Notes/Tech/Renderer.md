@@ -32,10 +32,15 @@ Camera-space projection using the inverse of the camera matrix, then:
 
 Each sprite has a world `Size` (1 = full wall height) and `Lift` above the floor: keys hover and bob, blood droplets arc.
 
+## Looking up and down
+
+**Y-shearing:** the horizon line is moved by `Pitch × scale` pixels and everything (floor split, wall columns, sprites) is drawn relative to it. It is not a true camera rotation, so vertical lines stay vertical, but it costs nothing and it is exact for the one thing that matters: a bullet fired with slope `Pitch` lands precisely where the crosshair points. `Engine.MaxPitch` (0.3) keeps the horizon on or near the screen.
+
 ## Effects
 
 - **Screen shake:** shifts the horizon by a few pixels while `Engine.Shake` > 0.
 - **Damage flash:** whole-frame tint toward red proportional to `HurtFlash`.
+- **Rockets and explosions** are glow billboards: the fireball grows from 0.5 to 1.8 wall-heights over 0.35 s.
 - **Title backdrop:** the same renderer with the overlay off, slowly turning.
 
 ## Cost

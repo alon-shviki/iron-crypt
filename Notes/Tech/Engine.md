@@ -81,7 +81,7 @@ Deterministic per `(seed, depth)`; the level seed is `seed * 31 + depth * 7919`.
 
 ## Tests
 
-`IronCrypt.Tests/EngineTests.cs` — 44 tests, all headless: movement/collision (incl. a 20k-step random walk that must never end in a wall), generator determinism, **solvability of 1,200 generated levels** (keys reachable before their doors, exit reachable), door jambs, spawn placement, doors/keys/exit, weapons and reloads, pickups, armor, enemy sight/hearing/pathfinding/doors, a 40-second simulation per seed asserting nobody is ever inside a wall, and a **bot that plays 6 seeds × 4 depths to the exit**.
+`IronCrypt.Tests/EngineTests.cs` — 56 tests, all headless (full list in [[Tech/Testing]]): movement/collision (incl. a 20k-step random walk that must never end in a wall), generator determinism, **solvability of 1,200 generated levels** (keys reachable before their doors, exit reachable), door jambs, spawn placement, doors/keys/exit, weapons and reloads, pickups, armor, enemy sight/hearing/pathfinding/doors, a 40-second simulation per seed asserting nobody is ever inside a wall, and a **bot that plays 6 seeds × 4 depths to the exit**.
 
 ## Known limits
 

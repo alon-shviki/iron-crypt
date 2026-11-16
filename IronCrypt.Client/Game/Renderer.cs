@@ -61,8 +61,9 @@ public partial class Renderer
     {
         // screen shake: the whole horizon jitters for as long as the engine says (hits taken, shotgun blasts)
         var shake = e.Shake > 0 ? (int)(Math.Sin(e.Time * 95) * Math.Min(6, e.Shake * 28)) : 0;
-        var horizon = H / 2 + shake;
         var scale = W / (2 * PlaneLen); // wall height in pixels at distance 1
+        // looking up or down slides the horizon (y-shearing) — cheap, and exact for where the crosshair points
+        var horizon = H / 2 + shake + (int)(e.Pitch * scale);
 
         DrawFloorAndCeiling(horizon, scale);
         DrawWalls(e, horizon, scale);

@@ -10,6 +10,7 @@ There is no final level: difficulty rises with **depth** until the player dies, 
 | Rooms | min(5 + d, 11) | 6 | 8 | 11 | 11 |
 | Enemies | min(5 + 3d, 40) | 8 | 14 | 23 | 40 (d ≥ 12) |
 | Tank share of enemies | 0 at d=1, else min(5d, 25)% | 0% | 15% | 25% | 25% |
+| Charger share | 0 at d=1, else min(4d, 16)% | 0% | 12% | 16% | 16% |
 | Shooter share | min(15 + 5d, 45)% | 20% | 30% | 45% | 45% |
 | Enemy health | × (1 + 0.08 (d-1)) | ×1.0 | ×1.16 | ×1.40 | none |
 | Enemy damage | × (1 + 0.05 (d-1)) | ×1.0 | ×1.10 | ×1.25 | none |
@@ -18,11 +19,11 @@ The rest of the share is grunts.
 
 ## What keeps the player supplied
 
-Per room (except the start room), independent chances: bullets 55%, shells 35%, health 40%, armor 18%. Plus bullets in the start room, the shotgun in one of the first two rooms, and the chaingun from depth 2. Enemies grow faster (count and toughness) than supplies, so ammo gets tighter the deeper you go.
+Per room (except the start room), independent chances: bullets 55%, shells 35%, health 40%, armor 18%. Plus bullets in the start room, the shotgun in one of the first two rooms, the chaingun from depth 2, and from depth 3 the rocket launcher and rockets (22% per room). Enemies grow faster (count and toughness) than supplies, so ammo gets tighter the deeper you go.
 
 ## Scoring
 
-Kills pay 100 / 150 / 400. Clearing depth *n* pays 500 × *n*, so going deeper pays more per level and rewards pressing on.
+Kills pay 100 / 150 / 400 / 250 (grunt, shooter, tank, charger), plus style bonuses ([[Design/Trickshots]]). Clearing depth *n* pays 500 × *n*, so going deeper pays more per level and rewards pressing on.
 
 ## Safety rules the generator keeps
 

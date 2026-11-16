@@ -410,10 +410,14 @@ public class EngineTests
         var behind = e.SpawnEnemy(EnemyKind.Grunt, 1.5, 1.5)!;
         hidden.State = behind.State = EnemyState.Pain;
         hidden.Timer = behind.Timer = 100;
-        var hp = (hidden.Hp, behind.Hp);
+        behind.Hp = 10_000;
+        var hiddenHp = hidden.Hp;
+        e.Pitch = -0.03; // body height, so the numbers below are exact
 
-        Run(e, 2, Fire);
-        Assert.Equal(hp, (hidden.Hp, behind.Hp));
+        e.Tick(0.016, Fire);
+        Assert.Equal(hiddenHp, hidden.Hp); // the wall stops the bullet…
+        // …which bounces straight back: the one behind is only ever hit by the weakened ricochet
+        Assert.Equal(10_000 - (int)(Engine.Weapons[0].Damage * Engine.BankDamage), behind.Hp);
     }
 
     [Fact]
@@ -515,8 +519,8 @@ public class EngineTests
             {
                 e.Tick(1 / 60.0, new PlayerInput { Forward = Math.Sin(i / 50.0), Turn = 0.02, Fire = i % 3 == 0 });
                 if (i % 30 != 0) continue;
-                foreach (var en in e.Enemies)
-                    Assert.True(e.IsFree(en.X, en.Y, Engine.EnemyDefs[(int)en.Kind].Radius), $"enemy in wall, seed {seed} t={i}");
+                foreach (var en in e.Enemies.Where(en => en.Alive)) // a door may close over a corpse; living bodies never
+                    Assert.True(e.IsFree(en.X, en.Y, Engine.EnemyDefs[(int)en.Kind].Radius), $"{en.Kind} ({en.State}) in wall, seed {seed} t={i}");
                 Assert.True(e.IsFree(e.Px, e.Py), $"player in wall, seed {seed} t={i}");
             }
         }
@@ -650,6 +654,262 @@ public class EngineTests
         }
         Assert.Equal(5, e.Depth);
         Assert.True(e.Score >= Engine.LevelBonus * 10);
+    }
+
+    // ── Vertical look, headshots, trickshots ──
+
+    private static Enemy Dummy(Engine e, EnemyKind kind, double x, double y, int hp = 10_000)
+    {
+        var en = e.SpawnEnemy(kind, x, y)!;
+        en.State = EnemyState.Pain; // stands still
+        en.Timer = 1e9;
+        en.Hp = hp;
+        return en;
+    }
+
+    [Fact]
+    public void Look_TiltsTheView_WithinLimits()
+    {
+        var e = NewEngine();
+        e.Tick(0.016, new PlayerInput { Look = 0.1 });
+        Assert.Equal(0.1, e.Pitch, 6);
+        e.Tick(0.016, new PlayerInput { Look = 5 });
+        Assert.Equal(Engine.MaxPitch, e.Pitch);
+        e.Tick(0.016, new PlayerInput { Look = -50 });
+        Assert.Equal(-Engine.MaxPitch, e.Pitch);
+
+        var r = new Renderer(320, 200);
+        int Horizon() => Enumerable.Range(0, 200).First(y => r.Fb[y * 320 + 5] != r.Fb[5]);
+        e.Pitch = 0;
+        r.Render(e);
+        var level = Horizon();
+        e.Pitch = 0.2;
+        r.Render(e);
+        Assert.True(Horizon() > level, "looking up slides the scene down the screen");
+    }
+
+    [Fact]
+    public void AimingOverAnEnemy_Misses_AndAtItsHead_DoesDoubleDamage()
+    {
+        var e = NewEngine(Hall);
+        var grunt = Dummy(e, EnemyKind.Grunt, 5.5, 1.5); // 4 cells away, 0.72 tall
+        var pistol = Engine.Weapons[0].Damage;
+
+        e.Pitch = 0.2; // bullet is at height 1.3 by the time it gets there
+        e.Tick(0.016, Fire);
+        Assert.Equal(10_000, grunt.Hp);
+
+        e.Pitch = -0.05; // height 0.3: body
+        Run(e, 0.4, default);
+        e.Tick(0.016, Fire);
+        Assert.Equal(10_000 - pistol, grunt.Hp);
+
+        e.Pitch = 0.04; // height 0.66: head (top quarter starts at 0.54)
+        Run(e, 0.4, default);
+        e.Sounds.Clear();
+        e.Tick(0.016, Fire);
+        Assert.Equal(10_000 - pistol - pistol * Engine.HeadshotMultiplier, grunt.Hp);
+        Assert.Contains(Sfx.Headshot, e.Sounds);
+    }
+
+    [Fact]
+    public void HeadshotKill_PaysABonus_AndAnnouncesIt()
+    {
+        var e = NewEngine(Hall);
+        Dummy(e, EnemyKind.Grunt, 5.5, 1.5, hp: 1);
+        e.Pitch = 0.04;
+        e.Tick(0.016, Fire);
+
+        Assert.Equal(Engine.EnemyDefs[0].Score + Engine.HeadshotBonus, e.Score);
+        Assert.Equal(1, e.Tricks);
+        Assert.Contains("HEADSHOT", e.Message);
+        Assert.Contains(Sfx.Trick, e.Sounds);
+    }
+
+    [Fact]
+    public void BulletsBounceOnceOffWalls_BankShotKillsRoundACorner()
+    {
+        // the grunt is behind the pillar; the only way to it is off the south wall
+        var e = NewEngine(
+            "#########",
+            "#S..#...#",
+            "#.......#",
+            "#########");
+        var target = Dummy(e, EnemyKind.Grunt, 6.5, 1.5, hp: 1);
+        Assert.False(e.Level.LineOfSight(e.Px, e.Py, target.X, target.Y));
+
+        // aim at the mirror image of the target in the wall at y = 3
+        e.Angle = Math.Atan2((3 + (3 - target.Y)) - e.Py, target.X - e.Px);
+        e.Pitch = -0.03; // body height
+        e.Tick(0.016, Fire);
+
+        Assert.False(target.Alive);
+        Assert.Contains("BANK SHOT", e.Message);
+        Assert.Equal(Engine.EnemyDefs[0].Score + Engine.BankShotBonus, e.Score);
+    }
+
+    [Fact]
+    public void BankedBullets_AreWeaker_AndStopAfterOneBounce()
+    {
+        var e = NewEngine(
+            "#########",
+            "#S..#...#",
+            "#.......#",
+            "#########");
+        var target = Dummy(e, EnemyKind.Grunt, 6.5, 1.5);
+        e.Angle = Math.Atan2((3 + (3 - target.Y)) - e.Py, target.X - e.Px);
+        e.Pitch = -0.03; // body height
+        e.Tick(0.016, Fire);
+        Assert.Equal(10_000 - (int)(Engine.Weapons[0].Damage * Engine.BankDamage), target.Hp);
+
+        // straight at the far wall and back would need two bounces to reach something behind the player
+        var hall = NewEngine(Hall);
+        var behind = Dummy(hall, EnemyKind.Grunt, 5.5, 1.5);
+        hall.Px = 8.5;
+        hall.Angle = Math.PI / 2; // into the side wall: bounces straight back through the player's own position, never sideways
+        hall.Tick(0.016, Fire);
+        Assert.Equal(10_000, behind.Hp);
+    }
+
+    [Fact]
+    public void LongShot_SpinShot_AndDoubleKill_AreRecognised()
+    {
+        var far = NewEngine("##############", "#S...........#", "##############");
+        Dummy(far, EnemyKind.Grunt, 11.5, 1.5, hp: 1); // 10 cells
+        far.Pitch = -0.01;
+        far.Tick(0.016, Fire);
+        Assert.Contains("LONG SHOT", far.Message);
+
+        var spin = NewEngine(Hall);
+        Dummy(spin, EnemyKind.Grunt, 4.5, 1.5, hp: 1);
+        for (var i = 0; i < 10; i++) spin.Tick(0.016, new PlayerInput { Turn = Math.PI * 2 / 10 }); // a 360 in a sixth of a second
+        spin.Tick(0.016, Fire);
+        Assert.Contains("SPIN SHOT", spin.Message);
+
+        var calm = NewEngine(Hall);
+        Dummy(calm, EnemyKind.Grunt, 4.5, 1.5, hp: 1);
+        Run(calm, 3, new PlayerInput { Turn = 2.6 / 60 }); // holding an arrow key is not a trick
+        calm.Angle = 0;
+        calm.Tick(0.016, Fire);
+        Assert.DoesNotContain("SPIN", calm.Message);
+
+        var two = NewEngine("#########", "#S......#", "#.......#", "#########");
+        Dummy(two, EnemyKind.Grunt, 5.5, 1.5, hp: 1);
+        Dummy(two, EnemyKind.Grunt, 5.5, 2.5, hp: 1);
+        two.Explode(5.5, 2.0, 0.4);
+        Assert.Contains("DOUBLE KILL", two.Message);
+        Assert.Equal(2, two.Kills);
+    }
+
+    // ── Rocket launcher ──
+
+    [Fact]
+    public void RocketLauncher_IsPickedUp_Fires_AndTheRocketExplodesOnTheWall()
+    {
+        var e = NewEngine("##############", "#S...........#", "##############");
+        e.Pickups.Add(new Pickup { Kind = PickupKind.RocketLauncher, X = e.Px, Y = e.Py });
+        e.Tick(0.016, default);
+        Assert.True(e.Owned[3]);
+        Assert.Equal(3, e.Weapon);
+        Assert.Equal(4, e.Rockets);
+
+        var near = Dummy(e, EnemyKind.Tank, 11.0, 1.5);
+        Run(e, 0.4, default); // weapon comes up
+        e.Tick(0.016, Fire);
+        Assert.Single(e.Missiles);
+        Assert.Contains(Sfx.Rocket, e.Sounds);
+        Assert.Equal(10_000, near.Hp); // still in flight
+
+        Run(e, 2, default);
+        Assert.Empty(e.Missiles);
+        Assert.Contains(Sfx.Explosion, e.Sounds);
+        Assert.True(near.Hp < 10_000, "direct hit");
+        Assert.Equal(Engine.MaxHealth, e.Health); // 9+ cells away: no self damage
+        Run(e, 1, default);
+        Assert.Empty(e.Explosions);
+    }
+
+    [Fact]
+    public void Splash_FallsOffWithDistance_NeedsLineOfSight_AndHurtsThePlayer()
+    {
+        var e = NewEngine("#########", "#S..#...#", "#.......#", "#########");
+        var close = Dummy(e, EnemyKind.Grunt, 6.5, 2.5);
+        var edge = Dummy(e, EnemyKind.Grunt, 7.5, 1.5);
+        var walled = Dummy(e, EnemyKind.Grunt, 3.5, 1.5); // other side of the pillar from the blast
+        e.Explode(5.5, 1.5, 0.5);
+
+        Assert.True(close.Hp < edge.Hp, "nearer = more damage");
+        Assert.True(edge.Hp < 10_000);
+        Assert.Equal(10_000, walled.Hp);
+
+        var self = NewEngine();
+        self.Explode(self.Px + 0.5, self.Py, 0.5);
+        Assert.InRange(self.Health, 1, Engine.MaxHealth - 20);
+    }
+
+    [Fact]
+    public void RocketsFlyAlongThePitch_AndHitTheFloorWhenAimedDown()
+    {
+        var e = NewEngine("##############", "#S...........#", "##############");
+        e.Owned[3] = true;
+        e.Tick(0.016, new PlayerInput { Weapon = 4 });
+        Run(e, 0.4, default);
+        e.Pitch = -0.3;
+        e.Tick(0.016, Fire);
+        Run(e, 1, default);
+        Assert.Empty(e.Missiles); // hit the floor ~1.5 cells out instead of flying to the far wall
+        Assert.True(e.Health < Engine.MaxHealth, "blast at your own feet hurts");
+    }
+
+    // ── Charger ──
+
+    [Fact]
+    public void Charger_Telegraphs_ThenRamsThePlayer()
+    {
+        var e = NewEngine("##############", "#S...........#", "##############");
+        var charger = e.SpawnEnemy(EnemyKind.Charger, 6.5, 1.5)!;
+        charger.State = EnemyState.Chase;
+        e.Tick(0.016, default);
+        Assert.Equal(EnemyState.Windup, charger.State);
+        Assert.Contains(Sfx.EnemyAlert, e.Sounds);
+        Assert.Equal(Engine.MaxHealth, e.Health);
+
+        Run(e, 1.5, default);
+        Assert.Equal(Engine.MaxHealth - Engine.EnemyDefs[3].Damage, e.Health);
+        Assert.NotEqual(EnemyState.Charge, charger.State);
+    }
+
+    [Fact]
+    public void Charger_CannotSteer_SidesteppingMakesItRamTheWallAndStun()
+    {
+        var e = NewEngine(
+            "##########",
+            "#........#",
+            "#S.......#",
+            "#........#",
+            "##########");
+        var charger = e.SpawnEnemy(EnemyKind.Charger, 7.5, 2.5)!;
+        charger.State = EnemyState.Chase;
+        Run(e, 0.55, default);                 // it locks on at the end of the wind-up…
+        Assert.Equal(EnemyState.Windup, charger.State);
+        Run(e, 0.1, default);
+        Assert.Equal(EnemyState.Charge, charger.State);
+        e.Py = 1.3;                            // …and the player steps out of the lane
+        Run(e, 1.0, default);
+
+        Assert.Equal(Engine.MaxHealth, e.Health);
+        Assert.Equal(EnemyState.Pain, charger.State); // dazed against the west wall
+        Assert.True(charger.X < 2);
+        Assert.True(e.IsFree(charger.X, charger.Y, Engine.EnemyDefs[3].Radius));
+    }
+
+    [Fact]
+    public void Generator_AddsChargersAndRockets_OnlyFromTheirDepth()
+    {
+        Assert.DoesNotContain(Enumerable.Range(1, 40).SelectMany(s => LevelGenerator.Generate(s, 1).Enemies), en => en.Kind == EnemyKind.Charger);
+        Assert.Contains(Enumerable.Range(1, 40).SelectMany(s => LevelGenerator.Generate(s, 3).Enemies), en => en.Kind == EnemyKind.Charger);
+        Assert.DoesNotContain(Enumerable.Range(1, 40).SelectMany(s => LevelGenerator.Generate(s, 2).Pickups), p => p.Kind is PickupKind.RocketLauncher or PickupKind.Rockets);
+        Assert.All(Enumerable.Range(1, 40), s => Assert.Contains(LevelGenerator.Generate(s, 3).Pickups, p => p.Kind == PickupKind.RocketLauncher));
     }
 
     // ── Renderer ──

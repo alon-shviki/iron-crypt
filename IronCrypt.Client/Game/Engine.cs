@@ -5,6 +5,7 @@ public enum Sfx
 {
     Step, Door, DoorLocked, Pistol, Shotgun, Chaingun, Empty, Reload, Pickup, Key,
     EnemyHurt, EnemyDie, EnemyAlert, EnemyShot, PlayerHurt, PlayerDie, LevelDone, WeaponGet,
+    Rocket, Explosion, Headshot, Trick,
 }
 
 /// <summary>One frame of player intent, already device-independent (keyboard, mouse and touch all fold into this).</summary>
@@ -12,6 +13,7 @@ public struct PlayerInput
 {
     public double Forward, Strafe; // -1..1
     public double Turn;            // radians to rotate this frame
+    public double Look;            // change in pitch this frame (positive = look up)
     public bool Fire, Reload;
     public int Weapon;             // 0 = keep, 1..3 = select, -1 = cycle
 }
@@ -34,11 +36,13 @@ public partial class Engine
     public const double DoorSpeed = 2.5;     // open fraction per second
     public const float DoorHold = 3f;        // seconds a door stays open after the last trigger
     public const double PickupReach = 0.55;
+    public const double MaxPitch = 0.3;      // how far the view tilts, as a slope (height per cell of distance)
 
     public Level Level = Level.FromRows("###", "#S#", "###");
     public int Seed;
     public int Depth;
     public double Px, Py, Angle;
+    public double Pitch;                     // look up/down as a slope: a shot rises Pitch cells per cell travelled
     public double Bob;                       // walk-cycle phase, drives weapon sway
     public bool Moving;
     public double Time;                      // seconds of simulated play on this level
@@ -51,6 +55,7 @@ public partial class Engine
 
     private readonly List<int> _doors = new();
     private double _stepTimer;
+    private double _spin;
     private double _lockedCooldown;
 
     /// <summary>Any text is a valid seed: numbers are used as-is, anything else is hashed (stable across runs).</summary>
@@ -85,6 +90,7 @@ public partial class Engine
         Px = level.StartX;
         Py = level.StartY;
         Angle = level.StartAngle;
+        Pitch = 0;
         Time = 0;
         HasRedKey = HasBlueKey = false;
         LevelComplete = false;
@@ -130,6 +136,9 @@ public partial class Engine
     private void MovePlayer(double dt, in PlayerInput input)
     {
         Angle = (Angle + input.Turn) % (Math.PI * 2);
+        Pitch = Math.Clamp(Pitch + input.Look, -MaxPitch, MaxPitch);
+        // recent turning, fading by 90% a second — a kill right after a fast spin is a trickshot
+        _spin = (_spin + input.Turn) * Math.Pow(0.1, dt);
 
         var f = Math.Clamp(input.Forward, -1, 1);
         var s = Math.Clamp(input.Strafe, -1, 1);

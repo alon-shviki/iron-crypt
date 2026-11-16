@@ -12,6 +12,7 @@ public static partial class Art
         {
             EnemyKind.Grunt => (Rgb(150, 74, 48), Rgb(92, 42, 30), Rgb(255, 214, 60), 24, 9),
             EnemyKind.Shooter => (Rgb(84, 104, 78), Rgb(46, 58, 46), Rgb(255, 70, 50), 22, 8),
+            EnemyKind.Charger => (Rgb(126, 62, 140), Rgb(70, 34, 84), Rgb(255, 120, 30), 30, 9),
             _ => (Rgb(92, 96, 112), Rgb(48, 50, 62), Rgb(110, 220, 255), 40, 7),
         };
         var p = new Painter();
@@ -34,6 +35,13 @@ public static partial class Art
         if (kind == EnemyKind.Shooter) p.Rect(32 - head, headY - 1, head * 2, 4, Rgb(20, 22, 24)); // visor
         p.Rect(32 - head / 2 - 2, headY - 1, 3, 2, accent).Rect(32 + head / 2 - 1, headY - 1, 3, 2, accent);
         if (kind == EnemyKind.Grunt) p.Rect(28, headY + 4, 8, 2, Rgb(240, 240, 220)); // teeth
+        if (kind == EnemyKind.Charger)
+        {
+            // horns, swept up and out
+            var horn = Rgb(232, 226, 200);
+            p.Rect(32 - head - 5, headY - 6, 6, 4, horn).Rect(32 - head - 7, headY - 12, 4, 8, horn);
+            p.Rect(32 + head - 1, headY - 6, 6, 4, horn).Rect(32 + head + 3, headY - 12, 4, 8, horn);
+        }
         if (kind == EnemyKind.Tank) p.Rect(32 - w / 2 + 4, 30, w - 8, 3, accent);     // chest light
 
         // arms
@@ -56,6 +64,10 @@ public static partial class Art
                     p.Rect(ax, 26, 5, 12, body).Rect(bx, 26, 5, 12, body);
                     p.Rect(27, 30, 10, 8, Rgb(34, 36, 40));
                     p.Ellipse(32, 34, 8, 8, Rgb(255, 170, 40)).Ellipse(32, 34, 4, 4, Rgb(255, 250, 210));
+                    break;
+                case EnemyKind.Charger: // head down, shoulders hunched, pawing the ground
+                    p.Rect(ax - 2, 22, 7, 14, body).Rect(bx, 22, 7, 14, body);
+                    p.Rect(32 - w / 2, 22, w, 6, accent);
                     break;
                 default: // both fists forward
                     p.Ellipse(ax + 1, 36, 9, 9, body).Ellipse(bx + 4, 36, 9, 9, body);

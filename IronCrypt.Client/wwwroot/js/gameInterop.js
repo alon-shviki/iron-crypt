@@ -1,6 +1,7 @@
 window.gameInterop = {
     _keys: {},
     _mouseDx: 0,      // accumulated mouse-look pixels since the last frame
+    _mouseDy: 0,      // same, vertical (look up / down)
     _fire: false,
     _weapon: 0,       // edge: 1..3 select, -1 cycle
     _reload: false,   // edge
@@ -9,7 +10,7 @@ window.gameInterop = {
     _forcePause: false, // edge: focus/tab/pointer lost — pauses but never un-pauses
     _touch: false,    // set on the first touch; switches the UI to touch controls
     _tf: 0, _ts: 0,   // touch stick: forward / strafe, -1..1
-    _moveId: null, _lookId: null, _fireId: null, _mx: 0, _my: 0, _lx: 0,
+    _moveId: null, _lookId: null, _fireId: null, _mx: 0, _my: 0, _lx: 0, _ly: 0,
     _canvas: null, _ctx: null, _img: null,
 
     startLoop(dotnetRef) {
@@ -44,6 +45,7 @@ window.gameInterop = {
             if (e.code === 'Digit1') g._weapon = 1;
             if (e.code === 'Digit2') g._weapon = 2;
             if (e.code === 'Digit3') g._weapon = 3;
+            if (e.code === 'Digit4') g._weapon = 4;
             if (e.code === 'KeyQ') g._weapon = -1;
             if (e.code === 'KeyR') g._reload = true;
             if (e.code === 'KeyM') g._mute = true;
@@ -59,7 +61,7 @@ window.gameInterop = {
             }
         });
         document.addEventListener('mousemove', e => {
-            if (document.pointerLockElement === g._canvas) g._mouseDx += e.movementX;
+            if (document.pointerLockElement === g._canvas) { g._mouseDx += e.movementX; g._mouseDy += e.movementY; }
         });
         g._canvas.addEventListener('mousedown', e => { if (e.button === 0) g._fire = true; });
         window.addEventListener('mouseup', e => { if (e.button === 0) g._fire = false; });
@@ -98,7 +100,7 @@ window.gameInterop = {
                     if (kind === 'fire') {
                         g._fire = true;
                         g._fireId = t.identifier;
-                        if (g._lookId === null) { g._lookId = t.identifier; g._lx = t.clientX; }
+                        if (g._lookId === null) { g._lookId = t.identifier; g._lx = t.clientX; g._ly = t.clientY; }
                     }
                     e.preventDefault();
                     continue;
@@ -107,7 +109,7 @@ window.gameInterop = {
                 if (t.clientX < window.innerWidth / 2 && g._moveId === null) {
                     g._moveId = t.identifier; g._mx = t.clientX; g._my = t.clientY;
                 } else if (g._lookId === null) {
-                    g._lookId = t.identifier; g._lx = t.clientX;
+                    g._lookId = t.identifier; g._lx = t.clientX; g._ly = t.clientY;
                 }
                 e.preventDefault();
             }
@@ -120,7 +122,9 @@ window.gameInterop = {
                 }
                 if (t.identifier === g._lookId) {
                     g._mouseDx += (t.clientX - g._lx) * LOOK;
+                    g._mouseDy += (t.clientY - g._ly) * LOOK * 0.6; // gentler vertically: thumbs drift
                     g._lx = t.clientX;
+                    g._ly = t.clientY;
                 }
             }
         }, { passive: true });
@@ -141,7 +145,7 @@ window.gameInterop = {
     },
 
     // One interop round-trip per frame: the input rides along with the Tick call.
-    // [forward, strafe, keyTurn, mouseDx, fire, weaponEdge, reloadEdge, pauseEdge, muteEdge, viewW, viewH, forcePauseEdge]
+    // [forward, strafe, keyTurn, mouseDx, fire, weaponEdge, reloadEdge, pauseEdge, muteEdge, viewW, viewH, forcePauseEdge, mouseDy]
     readInput() {
         const g = window.gameInterop;
         const k = g._keys;
@@ -155,8 +159,8 @@ window.gameInterop = {
         const fire = g._fire || k['Space'] || k['ControlLeft'];
         const out = [fwd, strafe, turn, g._mouseDx, fire ? 1 : 0, g._weapon,
             g._reload ? 1 : 0, g._pause ? 1 : 0, g._mute ? 1 : 0, window.innerWidth, window.innerHeight,
-            g._forcePause ? 1 : 0];
-        g._mouseDx = 0;
+            g._forcePause ? 1 : 0, g._mouseDy];
+        g._mouseDx = g._mouseDy = 0;
         g._weapon = 0;
         g._reload = g._pause = g._mute = g._forcePause = false;
         return out;
@@ -289,6 +293,10 @@ window.gameInterop = {
             case 15: g._tone('sawtooth', 210, 28, 1.1, 0.35, 0, null, 900); break;                        // PlayerDie
             case 16: arp([523, 659, 784, 1047], 0.11, 0.14); break;                                       // LevelDone
             case 17: arp([392, 523, 784], 0.09, 0.16); break;                                             // WeaponGet
+            case 18: g._noise(0.5, 0.4, 900); g._tone('sawtooth', 90, 300, 0.45, 0.2, 0, null, 800); break; // Rocket (whoosh)
+            case 19: g._noise(0.9, 1.0, 600); g._tone('sine', 120, 25, 0.7, 0.8); break;                  // Explosion
+            case 20: g._tone('triangle', 1400, 1900, 0.07, 0.3); break;                                   // Headshot (ding)
+            case 21: arp([659, 880, 1175, 1568], 0.06, 0.15); break;                                      // Trick
         }
     },
 

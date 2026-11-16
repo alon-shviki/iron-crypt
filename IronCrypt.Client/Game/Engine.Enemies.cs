@@ -1,10 +1,10 @@
 namespace IronCrypt.Client.Game;
 
-public enum EnemyState { Idle, Chase, Windup, Pain, Dead }
+public enum EnemyState { Idle, Chase, Windup, Pain, Dead, Charge }
 
 /// <summary>Stats per enemy type. Range is how close it must be to start an attack; Windup is the telegraph before it lands.</summary>
 public record EnemyDef(int Hp, double Speed, double Radius, int Damage, double Range, double Windup, double Rest,
-    bool Ranged, double PainChance, int Score, double Size);
+    bool Ranged, double PainChance, int Score, double Size, bool Charges = false);
 
 public struct BloodDrop
 {
@@ -20,6 +20,7 @@ public class Enemy
     public double Timer;     // time left in Windup / Pain
     public double Cooldown;  // rest before the next attack
     public double Anim;      // walk-cycle phase
+    public double Dx, Dy;    // direction of a charge in progress
     public bool Alive => State != EnemyState.Dead;
 }
 
@@ -32,10 +33,15 @@ public partial class Engine
         /* Grunt   */ new(Hp: 40,  Speed: 2.3,  Radius: 0.28, Damage: 10, Range: 0.9, Windup: 0.30, Rest: 0.7, Ranged: false, PainChance: 0.6, Score: 100, Size: 0.72),
         /* Shooter */ new(Hp: 30,  Speed: 1.7,  Radius: 0.28, Damage: 8,  Range: 9.0, Windup: 0.60, Rest: 1.1, Ranged: true,  PainChance: 0.7, Score: 150, Size: 0.78),
         /* Tank    */ new(Hp: 180, Speed: 1.05, Radius: 0.36, Damage: 30, Range: 1.1, Windup: 0.55, Rest: 1.0, Ranged: false, PainChance: 0.2, Score: 400, Size: 0.98),
+        // Range = how far away it starts a charge; Damage = what the charge does if it connects
+        /* Charger */ new(Hp: 60,  Speed: 2.0,  Radius: 0.30, Damage: 25, Range: 7.0, Windup: 0.60, Rest: 1.4, Ranged: false, PainChance: 0.3, Score: 250, Size: 0.80, Charges: true),
     };
     public const double SightRange = 12;     // an idle enemy notices the player within this distance, given line of sight
     public const int HearingRange = 16;      // …or hears a gunshot within this many walking cells
     public const double PainTime = 0.18;
+    public const double ChargeSpeed = 8;     // cells per second — faster than the player, so sidestep, do not outrun
+    public const double ChargeLength = 9;    // cells before it gives up
+    public const double StunTime = 0.9;      // dazed after ramming a wall — the opening to punish it
     public const double HpPerDepth = 0.08;   // +8% enemy health per level below the first
     public const double DamagePerDepth = 0.05;
 
@@ -54,6 +60,8 @@ public partial class Engine
     {
         Enemies.Clear();
         Blood.Clear();
+        Missiles.Clear();
+        Explosions.Clear();
         _flowCell = -1;
         foreach (var s in Level.Enemies) SpawnEnemy(s.Kind, s.X, s.Y);
     }
@@ -112,16 +120,21 @@ public partial class Engine
                     if (en.Timer <= 0) Attack(en, def, dist);
                     break;
 
+                case EnemyState.Charge:
+                    TickCharge(en, def, dt);
+                    break;
+
                 case EnemyState.Chase:
                     var sees = Level.LineOfSight(en.X, en.Y, Px, Py);
                     if (sees && dist <= def.Range && en.Cooldown <= 0)
                     {
                         en.State = EnemyState.Windup;
                         en.Timer = def.Windup;
+                        if (def.Charges) Sounds.Add(Sfx.EnemyAlert); // the roar is the warning
                         break;
                     }
-                    // shooters hold their ground once they have a clear shot; brawlers stop at arm's length
-                    var holds = sees && dist < (def.Ranged ? def.Range * 0.6 : def.Range * 0.8);
+                    // shooters hold their ground once they have a clear shot; brawlers stop at arm's length; chargers keep closing in
+                    var holds = !def.Charges && sees && dist < (def.Ranged ? def.Range * 0.6 : def.Range * 0.8);
                     if (!holds) Advance(en, def, sees, dist, dt);
                     break;
             }
@@ -134,6 +147,16 @@ public partial class Engine
         en.Cooldown = def.Rest;
         var damage = (int)(def.Damage * (1 + DamagePerDepth * Math.Max(0, Depth - 1)));
 
+        if (def.Charges)
+        {
+            // lock onto where the player is *now* and go — it cannot steer, so a sidestep beats it
+            en.State = EnemyState.Charge;
+            en.Timer = ChargeLength / ChargeSpeed;
+            en.Dx = dist < 1e-6 ? 1 : (Px - en.X) / dist;
+            en.Dy = dist < 1e-6 ? 0 : (Py - en.Y) / dist;
+            return;
+        }
+
         if (!def.Ranged)
         {
             if (dist <= def.Range + 0.35) Hurt(damage); // stepping back during the windup dodges it
@@ -144,6 +167,36 @@ public partial class Engine
         if (!Level.LineOfSight(en.X, en.Y, Px, Py)) return; // ducked behind cover during the windup
         var hitChance = Math.Clamp(0.85 - dist * 0.06, 0.25, 0.85);
         if (_rnd.NextDouble() < hitChance) Hurt(damage);
+    }
+
+    private void TickCharge(Enemy en, EnemyDef def, double dt)
+    {
+        en.Timer -= dt;
+        en.Anim += dt * 10;
+        var steps = (int)(ChargeSpeed * dt / 0.1) + 1; // short sub-steps: never through a wall or past the player
+        var h = ChargeSpeed * dt / steps;
+        for (var k = 0; k < steps; k++)
+        {
+            var (nx, ny) = (en.X + en.Dx * h, en.Y + en.Dy * h);
+            if (!IsFree(nx, ny, def.Radius))
+            {
+                en.State = EnemyState.Pain; // rammed a wall: dazed
+                en.Timer = StunTime;
+                en.Cooldown = def.Rest;
+                Sounds.Add(Sfx.EnemyHurt);
+                return;
+            }
+            (en.X, en.Y) = (nx, ny);
+            var reach = def.Radius + PlayerRadius + 0.1;
+            if ((Px - nx) * (Px - nx) + (Py - ny) * (Py - ny) > reach * reach) continue;
+            Hurt((int)(def.Damage * (1 + DamagePerDepth * Math.Max(0, Depth - 1))));
+            en.State = EnemyState.Chase;
+            en.Cooldown = def.Rest;
+            return;
+        }
+        if (en.Timer > 0) return;
+        en.State = EnemyState.Chase;
+        en.Cooldown = def.Rest;
     }
 
     private void Advance(Enemy en, EnemyDef def, bool sees, double dist, double dt)
@@ -231,29 +284,41 @@ public partial class Engine
         }
     }
 
-    /// <summary>One bullet along <paramref name="angle"/>: damages the nearest enemy in its path, if any is closer than the wall.</summary>
-    private void HitScan(double angle, double wallDist, int damage)
+    /// <summary>
+    /// One straight bullet segment from (ox, oy, oz): damages the nearest enemy it passes through before
+    /// <paramref name="limit"/>. Height matters — over its head is a miss, the top quarter is a headshot. True = it hit a body.
+    /// </summary>
+    private bool HitScan(double ox, double oy, double oz, double angle, double slope, double limit, int damage, bool banked, double travelled)
     {
         var cos = Math.Cos(angle);
         var sin = Math.Sin(angle);
         Enemy? hit = null;
-        var hitDist = wallDist;
+        var hitDist = limit;
         foreach (var en in Enemies)
         {
             if (!en.Alive) continue;
-            var dx = en.X - Px;
-            var dy = en.Y - Py;
+            var def = EnemyDefs[(int)en.Kind];
+            var dx = en.X - ox;
+            var dy = en.Y - oy;
             var along = dx * cos + dy * sin;
             if (along <= 0 || along >= hitDist) continue;
-            var across = Math.Abs(-dx * sin + dy * cos);
-            if (across > EnemyDefs[(int)en.Kind].Radius) continue;
+            if (Math.Abs(-dx * sin + dy * cos) > def.Radius) continue;
+            var z = oz + slope * along;
+            if (z < 0 || z > def.Size) continue;
             hit = en;
             hitDist = along;
         }
-        if (hit != null) Damage(hit, damage);
+        if (hit == null) return false;
+
+        var head = oz + slope * hitDist >= EnemyDefs[(int)hit.Kind].Size * HeadZone;
+        if (head) Sounds.Add(Sfx.Headshot);
+        Damage(hit, head ? damage * HeadshotMultiplier : damage, new HitInfo(head, banked, Splash: false, travelled + hitDist));
+        return true;
     }
 
-    public void Damage(Enemy en, int damage)
+    public void Damage(Enemy en, int damage) => Damage(en, damage, default);
+
+    public void Damage(Enemy en, int damage, HitInfo hit)
     {
         if (!en.Alive) return;
         var def = EnemyDefs[(int)en.Kind];
@@ -265,10 +330,11 @@ public partial class Engine
             Kills++;
             Score += def.Score;
             Sounds.Add(Sfx.EnemyDie);
+            AwardTricks(hit);
             return;
         }
         Sounds.Add(Sfx.EnemyHurt);
-        // being shot always wakes it; flinching (which interrupts an attack) is a per-type chance
+        // being shot always wakes it; flinching (which interrupts an attack or a charge) is a per-type chance
         if (en.State == EnemyState.Idle) en.State = EnemyState.Chase;
         if (_rnd.NextDouble() < def.PainChance)
         {

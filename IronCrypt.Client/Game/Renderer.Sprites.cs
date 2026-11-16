@@ -18,12 +18,16 @@ public partial class Renderer
     private readonly uint[][][] _pickupTex = new uint[Enum.GetValues<PickupKind>().Length][][];
     private uint[][] _exitTex = Array.Empty<uint[]>();
     private uint[][] _bloodTex = Array.Empty<uint[]>();
+    private uint[][] _missileTex = Array.Empty<uint[]>();
+    private uint[][] _explosionTex = Array.Empty<uint[]>();
     private readonly uint[][][][] _enemyTex = new uint[Enum.GetValues<EnemyKind>().Length][][][]; // [kind][frame][shade][texel]
 
     private void InitSprites()
     {
         foreach (var kind in Enum.GetValues<PickupKind>()) _pickupTex[(int)kind] = Art.Shaded(Art.PickupSprite(kind));
         _exitTex = Art.Shaded(Art.ExitSprite());
+        _missileTex = new[] { Art.MissileSprite() };   // glow sprites only ever use shade level 0
+        _explosionTex = new[] { Art.ExplosionSprite() };
         _bloodTex = Art.Shaded(new Painter().Ellipse(32, 32, 30, 30, Art.Rgb(190, 20, 20)).Px);
         foreach (var kind in Enum.GetValues<EnemyKind>())
             _enemyTex[(int)kind] = Enum.GetValues<EnemyFrame>().Select(f => Art.Shaded(Art.EnemySprite(kind, f))).ToArray();
@@ -101,6 +105,13 @@ public partial class Renderer
 
     private void CollectActors(Engine e)
     {
+        foreach (var m in e.Missiles)
+            _bills.Add(new Billboard { X = m.X, Y = m.Y, Tex = _missileTex, Size = 0.14, Lift = m.Z - 0.07, Glow = true });
+        foreach (var ex in e.Explosions)
+        {
+            var size = 0.5 + 1.3 * ex.Age / Engine.ExplosionTime; // fireball swells as it burns out
+            _bills.Add(new Billboard { X = ex.X, Y = ex.Y, Tex = _explosionTex, Size = size, Lift = ex.Z - size / 2, Glow = true });
+        }
         foreach (var b in e.Blood)
             _bills.Add(new Billboard { X = b.X, Y = b.Y, Tex = _bloodTex, Size = 0.06, Lift = b.Z });
 
@@ -110,7 +121,7 @@ public partial class Renderer
             {
                 EnemyState.Dead => EnemyFrame.Dead,
                 EnemyState.Pain => EnemyFrame.Pain,
-                EnemyState.Windup => EnemyFrame.Attack,
+                EnemyState.Windup or EnemyState.Charge => EnemyFrame.Attack,
                 _ => ((int)en.Anim & 1) == 0 ? EnemyFrame.Walk0 : EnemyFrame.Walk1,
             };
             _bills.Add(new Billboard

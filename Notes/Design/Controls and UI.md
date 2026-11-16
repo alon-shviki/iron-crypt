@@ -5,9 +5,9 @@
 | Action | Input |
 |---|---|
 | Move | `W` `A` `S` `D` |
-| Look | mouse (click the game once to capture it) or `←` `→` |
+| Look | mouse, up and down included (click the game once to capture it); `←` `→` turn |
 | Fire | left click, `Space` or `Ctrl` |
-| Weapon | `1` `2` `3`, `Q` cycles |
+| Weapon | `1` `2` `3` `4`, `Q` cycles |
 | Reload | `R` |
 | Pause | `P` or `Esc` (also when the mouse is released or the tab loses focus) |
 | Mute | `M` or the speaker icon |
@@ -17,7 +17,7 @@
 Controls appear after the first touch (the page adds `body.touch`).
 
 - **Left half of the screen:** a floating move stick, anchored where the thumb lands.
-- **Right half:** drag to look.
+- **Right half:** drag to look, up and down too (vertical is 60% as sensitive, because thumbs drift).
 - **FIRE button** bottom right; the thumb that holds it can keep dragging to aim.
 - **⇄** cycles weapons, **❙❙** pauses. Reload is automatic.
 

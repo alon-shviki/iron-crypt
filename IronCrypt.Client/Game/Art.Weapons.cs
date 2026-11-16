@@ -7,7 +7,7 @@ public static partial class Art
     private static readonly uint Sleeve = Rgb(60, 74, 52);
 
     /// <summary>Texel row of the muzzle for each weapon — where the flash is centred.</summary>
-    public static int MuzzleY(int weapon) => weapon switch { 1 => 6, 2 => 10, _ => 18 };
+    public static int MuzzleY(int weapon) => weapon switch { 1 => 6, 2 => 10, 3 => 28, _ => 18 };
 
     public static uint[] WeaponSprite(int weapon)
     {
@@ -26,6 +26,13 @@ public static partial class Art
                 p.Rect(26, 6, 4, 3, Rgb(18, 18, 20)).Rect(34, 6, 4, 3, Rgb(18, 18, 20));
                 p.Rect(22, 34, 20, 12, Rgb(124, 78, 40)).Rect(22, 34, 20, 2, Rgb(160, 104, 56));
                 p.Ellipse(32, 52, 14, 8, Skin);
+                break;
+            case 3: // rocket launcher: one fat tube on the shoulder, seen down its length — kept low so it never hides the crosshair
+                p.Rect(12, 52, 16, 12, Sleeve).Rect(38, 54, 14, 10, Sleeve);
+                p.Rect(22, 30, 22, 34, Rgb(70, 86, 64)).Rect(22, 30, 22, 4, Rgb(104, 124, 96));
+                p.Ellipse(33, 29, 13, 6, Rgb(40, 48, 38)).Ellipse(33, 29, 8, 3.5, Rgb(10, 10, 12)); // open muzzle
+                p.Rect(22, 46, 22, 3, Rgb(40, 48, 38));                                           // band
+                p.Ellipse(20, 56, 8, 6, Skin).Ellipse(44, 57, 7, 5, Skin);
                 break;
             default: // chaingun: barrel cluster, heavy body, both hands
                 p.Rect(10, 50, 16, 14, Sleeve).Rect(38, 50, 16, 14, Sleeve);

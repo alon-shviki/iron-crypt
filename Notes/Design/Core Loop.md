@@ -38,7 +38,7 @@ Health +25 · Armor +50 (soaks half of incoming damage) · Bullets +30 · Shells
 
 ## Scoring
 
-Grunt 100 · Shooter 150 · Tank 400 · clearing depth *n* pays 500 × *n*. Portal payload: `Value` = score, `Kills`, `Level` = depth reached.
+Grunt 100 · Shooter 150 · Tank 400 · Charger 250 · clearing depth *n* pays 500 × *n* · style bonuses for headshots, bank shots, long shots, spin shots and multi-kills ([[Design/Trickshots]]). Portal payload: `Value` = score, `Kills`, `Level` = depth reached.
 
 ## Difficulty curve
 

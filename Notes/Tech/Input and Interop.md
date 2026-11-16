@@ -27,6 +27,7 @@ A **busy guard** in the loop skips a frame instead of queueing overlapping ticks
 | 8 | mute, edge |
 | 9, 10 | viewport width, height (drives the internal resolution) |
 | 11 | forced pause, edge (focus, visibility or pointer lock lost) |
+| 12 | vertical mouse/touch-look delta in pixels (negative = up) |
 
 "Edge" values are latched in JS and cleared when read, so a quick tap between frames is never lost.
 

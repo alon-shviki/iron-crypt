@@ -59,14 +59,16 @@ CI (`.github/workflows/ci.yml`, a thin caller of the portal's reusable workflow)
 | Action  | Keyboard / mouse                                      | Touch                                  |
 | ------- | ----------------------------------------------------- | -------------------------------------- |
 | Move    | `W` `A` `S` `D`                                       | left thumb — floating stick            |
-| Look    | mouse (click the game to capture it) or `←` `→`       | right thumb — drag                     |
+| Look    | mouse, up/down too (click to capture); `←` `→`        | right thumb — drag                     |
 | Fire    | left click, `Space` or `Ctrl`                         | **FIRE** button (keep dragging to aim) |
-| Weapons | `1` `2` `3`, `Q` cycles                               | **⇄** button                           |
+| Weapons | `1`–`4`, `Q` cycles                                   | **⇄** button                           |
 | Reload  | `R` (also automatic on empty)                         | automatic                              |
 | Pause   | `P` / `Esc` (also automatic when the tab loses focus) | **❙❙** button                          |
 | Mute    | `M`                                                   | speaker icon                           |
 
 Doors open as you approach. Red and blue doors need the matching key.
+
+**Style pays:** headshots do double damage, bullets bounce once off walls, and headshot / bank-shot / long-shot / spin-shot / multi-kill kills earn bonus points. Rockets (key `4`, from depth 3) splash, including on you.
 
 ## Project Structure
 
